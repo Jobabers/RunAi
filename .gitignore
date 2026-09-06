@@ -1,0 +1,29 @@
+# Environment and secrets
+.env
+**/.env
+.env.*
+**/.env.*
+key.env
+**/key.env
+*.local
+**/*.local
+!.env.example
+!**/.env.example
+!*.env.example
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Runtime files
+.runai-dev-pids.json
+**/.runai-dev-pids.json
+*.log
+npm-debug.log*
+
+# Build output and caches
+dist/
+build/
+.nuxt/
+.output/
+.cache/

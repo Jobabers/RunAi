@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard | RunAI</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="dashboard-body">
+  <header class="dashboard-topbar">
+    <a class="brand-link" href="dashboard.html" aria-label="RunAI">
+      <span>RunAI</span>
+    </a>
+    <div class="topbar-actions">
+      <span class="user-pill" id="currentUserLabel">กำลังโหลด...</span>
+      <button class="ghost-button" id="logoutButton" type="button">Logout</button>
+    </div>
+  </header>
+
+  <main class="dashboard-page">
+    <section class="dashboard-intro" aria-labelledby="dashboardTitle">
+      <div>
+        <p class="eyebrow">Sprint 1</p>
+        <h1 id="dashboardTitle">Dashboard</h1>
+        <p id="nextActionText">กำลังตรวจสอบข้อมูลของคุณ</p>
+      </div>
+      <nav class="quick-nav" aria-label="Dashboard sections">
+        <a href="#profilePanel">Profile</a>
+        <a href="#goalPanel">Goal</a>
+        <a href="#runPanel">Run</a>
+        <a href="#historyPanel">History</a>
+      </nav>
+    </section>
+
+    <p class="message hidden" id="dashboardMessage"></p>
+
+    <section class="profile-gate hidden" id="profileGate" aria-labelledby="profileGateTitle">
+      <div class="gate-copy">
+        <p class="eyebrow">Profile</p>
+        <h2 id="profileGateTitle">กรอกข้อมูลพื้นฐานก่อน</h2>
+        <p>ข้อมูลนี้ใช้เป็นพื้นฐานของ RunAI ก่อนบันทึกการวิ่งครั้งแรกและสร้างเป้าหมาย</p>
+      </div>
+      <form class="gate-form" id="profileGateForm">
+        <label class="field">
+          <span>ชื่อ</span>
+          <input autocomplete="name" id="profileGateNameInput" required type="text">
+        </label>
+        <div class="three-column dashboard-columns">
+          <label class="field">
+            <span>อายุ</span>
+            <input id="profileGateAgeInput" min="1" required type="number">
+          </label>
+          <label class="field">
+            <span>น้ำหนัก</span>
+            <input id="profileGateWeightInput" min="1" required step="0.1" type="number">
+          </label>
+          <label class="field">
+            <span>ส่วนสูง</span>
+            <input id="profileGateHeightInput" min="1" required step="0.1" type="number">
+          </label>
+        </div>
+        <label class="field">
+          <span>ประสบการณ์</span>
+          <select id="profileGateExperienceInput" required>
+            <option value="beginner">Beginner</option>
+            <option value="intermediate">Intermediate</option>
+            <option value="advanced">Advanced</option>
+          </select>
+        </label>
+        <button class="primary-button" type="submit">Save Profile</button>
+      </form>
+    </section>
+
+    <section class="first-run-gate hidden" id="firstRunGate" aria-labelledby="firstRunTitle">
+      <div class="gate-copy">
+        <p class="eyebrow">First Run</p>
+        <h2 id="firstRunTitle">กรอกข้อมูลการวิ่งครั้งแรก</h2>
+        <p>บันทึกระยะทางและเวลาที่เคยวิ่ง เพื่อให้ระบบเริ่มประเมินพื้นฐานของคุณได้</p>
+      </div>
+      <form class="gate-form" id="firstRunForm">
+        <label class="field">
+          <span>ระยะทาง</span>
+          <input id="firstRunDistanceInput" min="0.1" placeholder="km" required step="0.1" type="number">
+        </label>
+        <label class="field">
+          <span>เวลา</span>
+          <input id="firstRunDurationInput" min="1" placeholder="minutes" required type="number">
+        </label>
+        <button class="primary-button" type="submit">Save First Run</button>
+      </form>
+    </section>
+
+    <section class="goal-gate hidden" id="goalGate" aria-labelledby="goalGateTitle">
+      <div class="gate-copy">
+        <p class="eyebrow">Goal</p>
+        <h2 id="goalGateTitle">สร้างเป้าหมายการวิ่ง</h2>
+        <p>หลังมี Profile และ First Run แล้ว ให้ตั้งเป้าหมายเพื่อใช้เป็นฐานของแผนฝึกใน Sprint ถัดไป</p>
+      </div>
+      <form class="gate-form" id="goalGateForm">
+        <label class="field">
+          <span>ประเภทเป้าหมาย</span>
+          <select id="goalGateTypeInput">
+            <option value="distance">เพิ่มระยะทาง</option>
+            <option value="endurance">เพิ่มความอึด</option>
+            <option value="race">เตรียมแข่ง</option>
+          </select>
+        </label>
+        <div class="two-column dashboard-columns">
+          <label class="field">
+            <span>ระยะเป้าหมาย</span>
+            <input id="goalGateDistanceInput" min="0.1" placeholder="km" required step="0.1" type="number">
+          </label>
+          <label class="field">
+            <span>เวลาที่อยากทำได้</span>
+            <input id="goalGateDurationInput" min="1" placeholder="minutes" type="number">
+          </label>
+        </div>
+        <label class="field">
+          <span>วันที่เป้าหมาย</span>
+          <input id="goalGateDateInput" required type="date">
+        </label>
+        <button class="primary-button" type="submit">Save Goal</button>
+      </form>
+    </section>
+
+    <div class="dashboard-workspace" id="dashboardWorkspace">
+      <section class="stats-grid" aria-label="Running summary">
+        <article class="stat-card">
+          <span>Active Goal</span>
+          <strong id="activeGoalStat">-</strong>
+          <small id="activeGoalMeta">ยังไม่มีเป้าหมาย</small>
+        </article>
+        <article class="stat-card">
+          <span>Total Runs</span>
+          <strong id="totalRunsStat">0</strong>
+          <small>รายการที่บันทึกแล้ว</small>
+        </article>
+        <article class="stat-card">
+          <span>Total Distance</span>
+          <strong id="totalDistanceStat">0 km</strong>
+          <small>ระยะทางสะสม</small>
+        </article>
+        <article class="stat-card">
+          <span>Latest Run</span>
+          <strong id="latestRunStat">-</strong>
+          <small id="latestRunMeta">ยังไม่มีประวัติวิ่ง</small>
+        </article>
+      </section>
+
+      <section class="dashboard-grid" aria-label="Sprint 1 workspace">
+        <article class="dashboard-panel progress-panel">
+          <div class="panel-heading">
+            <p class="eyebrow">Checklist</p>
+            <h2>สถานะ Sprint 1</h2>
+          </div>
+          <ol class="step-list" id="stepList"></ol>
+        </article>
+
+        <article class="dashboard-panel" id="profilePanel">
+          <div class="panel-heading">
+            <p class="eyebrow">Profile</p>
+            <h2>ข้อมูลพื้นฐาน</h2>
+          </div>
+          <form class="dashboard-form" id="profileForm">
+            <label class="field">
+              <span>ชื่อ</span>
+              <input id="profileNameInput" required type="text">
+            </label>
+            <div class="three-column dashboard-columns">
+              <label class="field">
+                <span>อายุ</span>
+                <input id="profileAgeInput" min="1" type="number">
+              </label>
+              <label class="field">
+                <span>น้ำหนัก</span>
+                <input id="profileWeightInput" min="1" step="0.1" type="number">
+              </label>
+              <label class="field">
+                <span>ส่วนสูง</span>
+                <input id="profileHeightInput" min="1" step="0.1" type="number">
+              </label>
+            </div>
+            <label class="field">
+              <span>ประสบการณ์</span>
+              <select id="profileExperienceInput">
+                <option value="beginner">Beginner</option>
+                <option value="intermediate">Intermediate</option>
+                <option value="advanced">Advanced</option>
+              </select>
+            </label>
+            <button class="primary-button" type="submit">Save Profile</button>
+          </form>
+        </article>
+
+        <article class="dashboard-panel" id="goalPanel">
+          <div class="panel-heading">
+            <p class="eyebrow">Goal</p>
+            <h2>เป้าหมายการวิ่ง</h2>
+          </div>
+          <form class="dashboard-form" id="goalForm">
+            <label class="field">
+              <span>ประเภทเป้าหมาย</span>
+              <select id="goalTypeInput">
+                <option value="distance">เพิ่มระยะทาง</option>
+                <option value="endurance">เพิ่มความอึด</option>
+                <option value="race">เตรียมแข่ง</option>
+              </select>
+            </label>
+            <div class="two-column dashboard-columns">
+              <label class="field">
+                <span>ระยะเป้าหมาย</span>
+                <input id="goalDistanceInput" min="0.1" placeholder="km" required step="0.1" type="number">
+              </label>
+              <label class="field">
+                <span>เวลาที่อยากทำได้</span>
+                <input id="goalDurationInput" min="1" placeholder="minutes" type="number">
+              </label>
+            </div>
+            <label class="field">
+              <span>วันที่เป้าหมาย</span>
+              <input id="goalDateInput" required type="date">
+            </label>
+            <button class="primary-button" type="submit">Save Goal</button>
+          </form>
+        </article>
+
+        <article class="dashboard-panel" id="runPanel">
+          <div class="panel-heading">
+            <p class="eyebrow">Run</p>
+            <h2>บันทึกการวิ่ง</h2>
+          </div>
+          <form class="dashboard-form" id="runForm">
+            <label class="field">
+              <span>วันที่วิ่ง</span>
+              <input id="runDateInput" required type="date">
+            </label>
+            <div class="two-column dashboard-columns">
+              <label class="field">
+                <span>ระยะทาง</span>
+                <input id="runDistanceInput" min="0.1" placeholder="km" required step="0.1" type="number">
+              </label>
+              <label class="field">
+                <span>เวลาที่ใช้</span>
+                <input id="runDurationInput" min="1" placeholder="minutes" required type="number">
+              </label>
+            </div>
+            <label class="field">
+              <span>ประเภทการวิ่ง</span>
+              <select id="runTypeInput">
+                <option value="Easy Run">Easy Run</option>
+                <option value="Long Run">Long Run</option>
+                <option value="Tempo Run">Tempo Run</option>
+                <option value="Recovery Run">Recovery Run</option>
+              </select>
+            </label>
+            <button class="primary-button" type="submit">Save Run</button>
+          </form>
+        </article>
+
+        <article class="dashboard-panel history-panel" id="historyPanel">
+          <div class="panel-heading">
+            <p class="eyebrow">History</p>
+            <h2>ประวัติการวิ่ง</h2>
+          </div>
+          <div class="history-list" id="historyList"></div>
+        </article>
+      </section>
+    </div>
+  </main>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>
