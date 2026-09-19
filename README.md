@@ -19,6 +19,87 @@ Note: the backend runs with in-memory storage by default for local development. 
 
 ## Run Locally
 
+### Requirements
+
+Install these first:
+
+- Node.js LTS, which includes `npm`
+- Git
+- A Supabase account and Supabase project
+- Windows PowerShell, if you want to use `run-dev.ps1`
+
+### 1. Clone or Open the Project
+
+If this is the first time setting up the project:
+
+```bash
+git clone <repository-url>
+cd "Project year 2 term 1"
+```
+
+If the project folder already exists, open the project root:
+
+```bash
+cd "C:\Users\ASUS\Desktop\Project year 2 term 1"
+```
+
+### 2. Install Dependencies
+
+Install backend dependencies:
+
+```bash
+cd coding/backend
+npm install
+```
+
+The frontend is plain HTML/CSS/JavaScript, so it does not need `npm install`.
+
+### 3. Create Backend Environment File
+
+Copy the example environment file:
+
+```bash
+cd coding/backend
+copy .env.example .env
+```
+
+Then edit `coding/backend/.env` and fill in your Supabase settings:
+
+```env
+PORT=4000
+FRONTEND_ORIGIN=http://localhost:3000
+STORAGE_DRIVER=supabase
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+```
+
+Use `SUPABASE_SERVICE_ROLE_KEY` only in the backend. Do not put Supabase secret keys in frontend HTML, CSS, or browser JavaScript.
+
+### 4. Setup Supabase Database
+
+In Supabase:
+
+1. Open your Supabase project.
+2. Go to SQL Editor.
+3. Run `coding/backend/database/schema.sql`.
+4. Go to Project Settings -> API Keys.
+5. Copy the Project URL, Publishable key, and Secret/service role key into `coding/backend/.env`.
+
+If this Supabase project already has the old RunAI tables with `public.users` and `password_hash`, run `coding/backend/database/migrate_to_supabase_auth.sql` first, then run `coding/backend/database/schema.sql`.
+
+Use `coding/backend/database/reset_for_supabase_auth.sql` only for dev/test data because it drops existing RunAI tables without keeping backups.
+
+### 5. Start the Project
+
+Recommended: run backend and frontend together from the project root:
+
+```bash
+.\run-dev.ps1
+```
+
+Or run them manually in two terminals.
+
 Backend:
 
 ```bash
@@ -38,24 +119,19 @@ Default URLs:
 - Frontend: `http://localhost:3000`
 - Backend API: `http://localhost:4000/api`
 
-## Supabase Setup
-
-Run `coding/backend/database/schema.sql` in Supabase SQL Editor first.
-
-If this Supabase project already has the old RunAI tables with `public.users` and `password_hash`, run `coding/backend/database/reset_for_supabase_auth.sql` first, then run `coding/backend/database/schema.sql`. Use the reset file only for dev/test data because it drops existing RunAI tables.
-
-Create `coding/backend/.env` from `coding/backend/.env.example`, then set:
-
-```env
-STORAGE_DRIVER=supabase
-SUPABASE_URL=https://your-project-ref.supabase.co
-SUPABASE_PUBLISHABLE_KEY=your-publishable-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-```
-
-Use `SUPABASE_SERVICE_ROLE_KEY` only in the backend. Do not put Supabase secret keys in frontend HTML, CSS, or browser JavaScript.
+## Supabase Notes
 
 Supabase Auth owns accounts in `auth.users`. RunAI profile data is stored in `public.profiles`; the app does not store `password_hash` in public tables.
+
+Keep `SUPABASE_SERVICE_ROLE_KEY` in `coding/backend/.env` only. Never put secret keys in frontend HTML, CSS, or browser JavaScript.
+
+## Team Git Workflow
+
+- `main` is the main shared branch.
+- Each teammate should work in their own branch.
+- Example: `people-2` for one teammate and `first-hansom` for another teammate.
+- Do not work directly on `main` during group development.
+- Commit and push your own branch, then open a Pull Request to merge into `main`.
 
 ## Verification
 
