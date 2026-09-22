@@ -6,7 +6,7 @@ process.env.STORAGE_DRIVER = 'memory';
 const app = require('./app');
 const store = require('./storage');
 const authProvider = require('./services/authProvider');
-const { toDateKey } = require('./utils/dates');
+const { addDays, toDateKey } = require('./utils/dates');
 
 function listen(serverApp) {
   return new Promise((resolve) => {
@@ -91,7 +91,7 @@ test('supports the first RunAI quest workflow', async (t) => {
       goal_type: 'วิ่ง 5K ให้ดีขึ้น',
       target_distance: 5,
       target_duration_minutes: 35,
-      target_date: '2026-10-31',
+      target_date: addDays(toDateKey(), 30),
     },
   });
   assert.equal(earlyGoal.response.status, 400);
@@ -116,7 +116,7 @@ test('supports the first RunAI quest workflow', async (t) => {
       goal_type: 'วิ่ง 5K ให้ดีขึ้น',
       target_distance: 5,
       target_duration_minutes: 35,
-      target_date: '2026-10-31',
+      target_date: addDays(toDateKey(), 30),
     },
   });
   assert.equal(goal.response.status, 201);
@@ -153,4 +153,110 @@ test('supports the first RunAI quest workflow', async (t) => {
   assert.equal(failed.response.status, 201);
   assert.equal(failed.data.progress.status, 'failed');
   assert.equal(failed.data.pending_adjustment.status, 'pending');
+});
+
+test('rejects invalid sprint 1 profile, run, and goal input', async (t) => {
+  store.resetForTests();
+  authProvider.resetForTests();
+  const server = await listen(app);
+  t.after(() => server.close());
+
+  const { port } = server.address();
+  const baseUrl = `http://127.0.0.1:${port}/api`;
+
+  await request(baseUrl, '/auth/register', {
+    method: 'POST',
+    body: {
+      email: 'validation-runner@example.com',
+      password: 'password123',
+    },
+  });
+
+  const login = await request(baseUrl, '/auth/login', {
+    method: 'POST',
+    body: {
+      email: 'validation-runner@example.com',
+      password: 'password123',
+    },
+  });
+  assert.equal(login.response.status, 200);
+  const { token } = login.data;
+
+  const invalidProfile = await request(baseUrl, '/me', {
+    method: 'PUT',
+    token,
+    body: {
+      name: 'Validation Runner',
+      age: 9,
+      weight: 64,
+      height: 172,
+      experience_level: 'beginner',
+    },
+  });
+  assert.equal(invalidProfile.response.status, 400);
+  assert.match(invalidProfile.data.error.message, /อายุ/);
+
+  const validProfile = await request(baseUrl, '/me', {
+    method: 'PUT',
+    token,
+    body: {
+      name: 'Validation Runner',
+      age: 20,
+      weight: 64,
+      height: 172,
+      experience_level: 'beginner',
+    },
+  });
+  assert.equal(validProfile.response.status, 200);
+
+  const futureRun = await request(baseUrl, '/runs', {
+    method: 'POST',
+    token,
+    body: {
+      run_date: addDays(toDateKey(), 1),
+      distance: 3,
+      duration_minutes: 24,
+      run_type: 'Easy Run',
+    },
+  });
+  assert.equal(futureRun.response.status, 400);
+  assert.match(futureRun.data.error.message, /อนาคต/);
+
+  const invalidRunType = await request(baseUrl, '/runs', {
+    method: 'POST',
+    token,
+    body: {
+      run_date: toDateKey(),
+      distance: 3,
+      duration_minutes: 24,
+      run_type: 'Sprint',
+    },
+  });
+  assert.equal(invalidRunType.response.status, 400);
+  assert.match(invalidRunType.data.error.message, /ประเภทการวิ่ง/);
+
+  const validRun = await request(baseUrl, '/runs', {
+    method: 'POST',
+    token,
+    body: {
+      run_date: toDateKey(),
+      distance: 3,
+      duration_minutes: 24,
+      run_type: 'Easy Run',
+    },
+  });
+  assert.equal(validRun.response.status, 201);
+
+  const todayGoal = await request(baseUrl, '/goals', {
+    method: 'POST',
+    token,
+    body: {
+      goal_type: 'distance',
+      target_distance: 5,
+      target_duration_minutes: 35,
+      target_date: toDateKey(),
+    },
+  });
+  assert.equal(todayGoal.response.status, 400);
+  assert.match(todayGoal.data.error.message, /อนาคต/);
 });

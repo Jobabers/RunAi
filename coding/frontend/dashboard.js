@@ -22,6 +22,12 @@ const elements = {
   latestRunMeta: document.getElementById('latestRunMeta'),
   stepList: document.getElementById('stepList'),
   historyList: document.getElementById('historyList'),
+  calendarTitle: document.getElementById('calendarTitle'),
+  calendarSummary: document.getElementById('calendarSummary'),
+  trainingCalendar: document.getElementById('trainingCalendar'),
+  calendarPrevButton: document.getElementById('calendarPrevButton'),
+  calendarTodayButton: document.getElementById('calendarTodayButton'),
+  calendarNextButton: document.getElementById('calendarNextButton'),
   profileForm: document.getElementById('profileForm'),
   goalForm: document.getElementById('goalForm'),
   runForm: document.getElementById('runForm'),
@@ -58,7 +64,10 @@ let dashboardState = {
   user: null,
   goals: [],
   runs: [],
+  activePlan: null,
 };
+
+let calendarCursor = new Date();
 
 function redirectToLogin() {
   localStorage.removeItem('runai_token');
@@ -100,6 +109,15 @@ async function apiFetch(path, options = {}) {
 function getNumberValue(input) {
   if (!input || input.value === '') return undefined;
   return Number(input.value);
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 function formatDistance(value) {
@@ -250,16 +268,123 @@ function renderGoalProgress() {
   document.getElementById('goalProgressBar').style.width = `${percent}%`;
 }
 
+function getMonthKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function groupRunsByDate(runs) {
+  return runs.reduce((groups, run) => {
+    const date = run.run_date;
+    const current = groups.get(date) || {
+      count: 0,
+      distance: 0,
+      duration: 0,
+      types: new Set(),
+    };
+
+    current.count += 1;
+    current.distance += Number(run.distance || 0);
+    current.duration += Number(run.duration_minutes || 0);
+    current.types.add(run.run_type || 'Easy Run');
+    groups.set(date, current);
+    return groups;
+  }, new Map());
+}
+
+function getPlanSessionsByDate(plan) {
+  const sessions = plan?.sessions || [];
+  return sessions.reduce((groups, session) => {
+    groups.set(session.session_date, session);
+    return groups;
+  }, new Map());
+}
+
+function getCalendarCell({ key, day, outsideMonth, run, session, today }) {
+  const isToday = key === today;
+  const isPast = key < today;
+  let state = 'rest';
+  let label = 'Rest';
+  let detail = '';
+
+  if (session) {
+    const targetDistance = Number(session.target_distance || 0);
+    label = `${session.training_type || 'Run'}${targetDistance ? ` ${formatDistance(targetDistance)}` : ''}`;
+    detail = session.status || 'planned';
+
+    if (session.status === 'expired' || session.status === 'failed' || (isPast && !run)) {
+      state = 'missed';
+      detail = 'Missed';
+    } else if (session.status === 'locked') {
+      state = 'upcoming';
+      detail = 'Upcoming';
+    } else {
+      state = isToday ? 'today' : 'planned';
+      detail = isToday ? 'Today' : 'Planned';
+    }
+  }
+
+  if (run) {
+    state = isToday ? 'today completed' : 'completed';
+    label = formatDistance(run.distance);
+    detail = run.count > 1 ? `${run.count} runs` : 'Completed';
+  } else if (!session && isToday) {
+    state = 'today';
+    label = 'Today';
+    detail = 'No run yet';
+  }
+
+  return `
+    <div class="calendar-day ${state} ${outsideMonth ? 'outside-month' : ''}">
+      <strong>${day}</strong>
+      <span>${escapeHtml(label)}</span>
+      <small>${escapeHtml(detail)}</small>
+    </div>
+  `;
+}
+
 function renderCalendar() {
-  const now = new Date();
-  const year = now.getFullYear(); const month = now.getMonth();
-  document.getElementById('calendarTitle').textContent = new Intl.DateTimeFormat('th-TH', { month: 'long', year: 'numeric' }).format(now);
-  const firstDay = new Date(year, month, 1); const offset = (firstDay.getDay() + 6) % 7;
-  const days = new Date(year, month + 1, 0).getDate(); const runsByDate = new Map(dashboardState.runs.map((run) => [run.run_date, run]));
-  const today = getTodayKey(); let cells = '';
-  for (let i = 0; i < offset; i += 1) cells += '<div class="calendar-day empty"></div>';
-  for (let day = 1; day <= days; day += 1) { const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`; const run = runsByDate.get(key); const past = key < today; const state = key === today ? 'today' : run ? 'run' : past ? 'rest' : 'upcoming'; cells += `<div class="calendar-day ${state}"><strong>${day}</strong><span>${run ? formatDistance(run.distance) : key === today ? 'วันนี้' : past ? 'พัก' : ''}</span></div>`; }
-  document.getElementById('trainingCalendar').innerHTML = cells;
+  const year = calendarCursor.getFullYear();
+  const month = calendarCursor.getMonth();
+  const monthKey = getMonthKey(calendarCursor);
+  const today = getTodayKey();
+  const runsByDate = groupRunsByDate(dashboardState.runs);
+  const sessionsByDate = getPlanSessionsByDate(dashboardState.activePlan);
+  const firstDay = new Date(year, month, 1);
+  const offset = (firstDay.getDay() + 6) % 7;
+  const gridStart = new Date(year, month, 1 - offset);
+  const monthFormatter = new Intl.DateTimeFormat('th-TH', { month: 'long', year: 'numeric' });
+  const monthRuns = dashboardState.runs.filter((run) => String(run.run_date).startsWith(monthKey));
+  const monthSessions = [...sessionsByDate.values()].filter((session) => String(session.session_date).startsWith(monthKey));
+  const completedCount = monthRuns.length;
+  const plannedCount = monthSessions.length;
+  const missedCount = monthSessions.filter((session) => (
+    session.status === 'expired'
+    || session.status === 'failed'
+    || (session.session_date < today && !runsByDate.has(session.session_date))
+  )).length;
+
+  elements.calendarTitle.textContent = monthFormatter.format(calendarCursor);
+  elements.calendarSummary.textContent = plannedCount
+    ? `${completedCount} completed · ${plannedCount} planned · ${missedCount} missed`
+    : `${completedCount} completed runs · no active training plan yet`;
+
+  const cells = [];
+  for (let index = 0; index < 42; index += 1) {
+    const date = new Date(gridStart);
+    date.setDate(gridStart.getDate() + index);
+
+    const key = toDateInputValue(date);
+    cells.push(getCalendarCell({
+      key,
+      day: date.getDate(),
+      outsideMonth: date.getMonth() !== month,
+      run: runsByDate.get(key),
+      session: sessionsByDate.get(key),
+      today,
+    }));
+  }
+
+  elements.trainingCalendar.innerHTML = cells.join('');
 }
 
 function renderGateFlow() {
@@ -291,16 +416,18 @@ function renderDashboard() {
 async function loadDashboard() {
   showDashboardMessage('');
   try {
-    const [meData, goalsData, runsData] = await Promise.all([
+    const [meData, goalsData, runsData, planData] = await Promise.all([
       apiFetch('/me'),
       apiFetch('/goals'),
       apiFetch('/runs'),
+      apiFetch('/training-plans/active'),
     ]);
 
     dashboardState = {
       user: meData.user,
       goals: goalsData.goals || [],
       runs: runsData.runs || [],
+      activePlan: planData.plan || null,
     };
 
     renderDashboard();
@@ -476,6 +603,18 @@ function bindEvents() {
   elements.profileForm.addEventListener('submit', handleProfileSubmit);
   elements.goalForm.addEventListener('submit', handleGoalSubmit);
   elements.runForm.addEventListener('submit', handleRunSubmit);
+  elements.calendarPrevButton.addEventListener('click', () => {
+    calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() - 1, 1);
+    renderCalendar();
+  });
+  elements.calendarTodayButton.addEventListener('click', () => {
+    calendarCursor = new Date();
+    renderCalendar();
+  });
+  elements.calendarNextButton.addEventListener('click', () => {
+    calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() + 1, 1);
+    renderCalendar();
+  });
 }
 
 function bootDashboard() {
@@ -491,7 +630,6 @@ function bootDashboard() {
   inputs.goalDate.value = getDefaultGoalDate();
   inputs.goalDate.min = getTodayKey();
   bindEvents();
-  document.getElementById('calendarTodayButton').addEventListener('click', renderCalendar);
   loadDashboard();
 }
 

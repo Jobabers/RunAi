@@ -273,10 +273,27 @@
           <div class="goal-progress-track"><span id="goalProgressBar"></span></div>
         </article>
         <article class="dashboard-panel calendar-panel">
-          <div class="panel-heading calendar-heading"><div><p class="eyebrow">Training Calendar</p><h2 id="calendarTitle">ปฏิทินการวิ่ง</h2></div><button class="ghost-button" id="calendarTodayButton" type="button">Today</button></div>
+          <div class="panel-heading calendar-heading">
+            <div>
+              <p class="eyebrow">Training Calendar</p>
+              <h2 id="calendarTitle">ปฏิทินการวิ่ง</h2>
+              <p class="calendar-summary" id="calendarSummary">กำลังโหลดปฏิทิน...</p>
+            </div>
+            <div class="calendar-controls" aria-label="ควบคุมปฏิทิน">
+              <button class="ghost-button calendar-nav-button" id="calendarPrevButton" type="button" aria-label="เดือนก่อนหน้า">‹</button>
+              <button class="ghost-button" id="calendarTodayButton" type="button">Today</button>
+              <button class="ghost-button calendar-nav-button" id="calendarNextButton" type="button" aria-label="เดือนถัดไป">›</button>
+            </div>
+          </div>
           <div class="calendar-weekdays"><span>จ</span><span>อ</span><span>พ</span><span>พฤ</span><span>ศ</span><span>ส</span><span>อา</span></div>
-          <div class="training-calendar" id="trainingCalendar"></div>
-          <p class="calendar-legend"><span class="legend-run">●</span> วันวิ่ง <span class="legend-today">●</span> วันนี้ <span class="legend-rest">●</span> วันพัก <span class="legend-missed">●</span> วันที่พลาด</p>
+          <div class="training-calendar" id="trainingCalendar" aria-live="polite"></div>
+          <div class="calendar-legend" aria-label="คำอธิบายสถานะ">
+            <span><i class="legend-run"></i> Completed</span>
+            <span><i class="legend-today"></i> Today</span>
+            <span><i class="legend-plan"></i> Upcoming</span>
+            <span><i class="legend-rest"></i> Rest</span>
+            <span><i class="legend-missed"></i> Missed</span>
+          </div>
         </article>
       </section>
     </div>
