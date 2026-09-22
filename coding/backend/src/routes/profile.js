@@ -18,10 +18,10 @@ router.put('/me', async (req, res, next) => {
       updates.name = String(name).trim();
     }
 
-    if (age !== undefined) updates.age = Number(age);
-    if (weight !== undefined) updates.weight = Number(weight);
-    if (height !== undefined) updates.height = Number(height);
-    if (experience_level !== undefined) updates.experience_level = String(experience_level);
+    if (age !== undefined) { assertCondition(Number(age) >= 10 && Number(age) <= 120, 400, 'อายุต้องอยู่ระหว่าง 10 ถึง 120 ปี'); updates.age = Number(age); }
+    if (weight !== undefined) { assertCondition(Number(weight) >= 20 && Number(weight) <= 400, 400, 'น้ำหนักต้องอยู่ระหว่าง 20 ถึง 400 กก.'); updates.weight = Number(weight); }
+    if (height !== undefined) { assertCondition(Number(height) >= 80 && Number(height) <= 260, 400, 'ส่วนสูงต้องอยู่ระหว่าง 80 ถึง 260 ซม.'); updates.height = Number(height); }
+    if (experience_level !== undefined) { assertCondition(['beginner', 'intermediate', 'advanced'].includes(String(experience_level)), 400, 'ระดับประสบการณ์ไม่ถูกต้อง'); updates.experience_level = String(experience_level); }
 
     const user = await store.updateRecord('profiles', req.user.user_id, updates);
     res.json({ user: store.publicUser(user) });

@@ -6,7 +6,6 @@ const elements = {
   userLabel: document.getElementById('currentUserLabel'),
   logoutButton: document.getElementById('logoutButton'),
   nextActionText: document.getElementById('nextActionText'),
-  quickNav: document.querySelector('.quick-nav'),
   profileGate: document.getElementById('profileGate'),
   profileGateForm: document.getElementById('profileGateForm'),
   firstRunGate: document.getElementById('firstRunGate'),
@@ -19,6 +18,7 @@ const elements = {
   totalRunsStat: document.getElementById('totalRunsStat'),
   totalDistanceStat: document.getElementById('totalDistanceStat'),
   latestRunStat: document.getElementById('latestRunStat'),
+  averagePaceStat: document.getElementById('averagePaceStat'),
   latestRunMeta: document.getElementById('latestRunMeta'),
   stepList: document.getElementById('stepList'),
   historyList: document.getElementById('historyList'),
@@ -107,6 +107,14 @@ function formatDistance(value) {
   return `${number.toFixed(number % 1 === 0 ? 0 : 1)} km`;
 }
 
+function formatPace(distance, duration) {
+  const pace = Number(duration) / Number(distance);
+  if (!Number.isFinite(pace) || pace <= 0) return '-';
+  const minutes = Math.floor(pace);
+  const seconds = Math.round((pace - minutes) * 60).toString().padStart(2, '0');
+  return `${minutes}:${seconds} /km`;
+}
+
 function formatDate(dateValue) {
   if (!dateValue) return '-';
   return new Intl.DateTimeFormat('th-TH', {
@@ -161,6 +169,7 @@ function renderStats() {
   const activeGoal = getActiveGoal(goals);
   const totalDistance = runs.reduce((sum, run) => sum + Number(run.distance || 0), 0);
   const latestRun = runs[0] || null;
+  const totalDuration = runs.reduce((sum, run) => sum + Number(run.duration_minutes || 0), 0);
 
   elements.totalRunsStat.textContent = String(runs.length);
   elements.totalDistanceStat.textContent = formatDistance(totalDistance);
@@ -173,13 +182,8 @@ function renderStats() {
     elements.activeGoalMeta.textContent = 'ยังไม่มีเป้าหมาย';
   }
 
-  if (latestRun) {
-    elements.latestRunStat.textContent = formatDistance(latestRun.distance);
-    elements.latestRunMeta.textContent = `${formatDate(latestRun.run_date)} · ${latestRun.run_type}`;
-  } else {
-    elements.latestRunStat.textContent = '-';
-    elements.latestRunMeta.textContent = 'ยังไม่มีประวัติวิ่ง';
-  }
+  elements.averagePaceStat.textContent = totalDistance ? formatPace(totalDistance, totalDuration).replace(' /km', '') : '-';
+  elements.latestRunMeta.textContent = totalDistance ? 'นาทีต่อกิโลเมตร' : 'ยังไม่มีประวัติวิ่ง';
 
   if (!isProfileComplete(user)) {
     elements.nextActionText.textContent = 'เริ่มจากกรอกข้อมูลพื้นฐานให้ครบก่อน';
@@ -230,19 +234,32 @@ function renderSteps() {
 
 function renderHistory() {
   if (!dashboardState.runs.length) {
-    elements.historyList.innerHTML = '<p class="empty-state">ยังไม่มีประวัติการวิ่ง</p>';
+    elements.historyList.innerHTML = '<tr><td colspan="5" class="table-empty">ยังไม่มีประวัติการวิ่ง</td></tr>';
     return;
   }
 
-  elements.historyList.innerHTML = dashboardState.runs.slice(0, 6).map((run) => `
-    <div class="history-item">
-      <div>
-        <strong>${formatDistance(run.distance)}</strong>
-        <small>${run.run_type || 'Easy Run'} · ${formatDate(run.run_date)}</small>
-      </div>
-      <span>${Number(run.duration_minutes)} min</span>
-    </div>
-  `).join('');
+  elements.historyList.innerHTML = dashboardState.runs.map((run) => `<tr><td>${formatDate(run.run_date)}</td><td>${run.run_type || 'Easy Run'}</td><td>${formatDistance(run.distance)}</td><td>${Number(run.duration_minutes)} min</td><td>${formatPace(run.distance, run.duration_minutes)}</td></tr>`).join('');
+}
+
+function renderGoalProgress() {
+  const goal = getActiveGoal(dashboardState.goals);
+  const total = dashboardState.runs.reduce((sum, run) => sum + Number(run.distance || 0), 0);
+  const percent = goal ? Math.min(100, Math.round(total / Number(goal.target_distance) * 100)) : 0;
+  document.getElementById('goalProgressPercent').textContent = `${percent}%`;
+  document.getElementById('goalProgressText').textContent = goal ? `${formatDistance(total)} จาก ${formatDistance(goal.target_distance)}` : 'ยังไม่มีเป้าหมาย';
+  document.getElementById('goalProgressBar').style.width = `${percent}%`;
+}
+
+function renderCalendar() {
+  const now = new Date();
+  const year = now.getFullYear(); const month = now.getMonth();
+  document.getElementById('calendarTitle').textContent = new Intl.DateTimeFormat('th-TH', { month: 'long', year: 'numeric' }).format(now);
+  const firstDay = new Date(year, month, 1); const offset = (firstDay.getDay() + 6) % 7;
+  const days = new Date(year, month + 1, 0).getDate(); const runsByDate = new Map(dashboardState.runs.map((run) => [run.run_date, run]));
+  const today = getTodayKey(); let cells = '';
+  for (let i = 0; i < offset; i += 1) cells += '<div class="calendar-day empty"></div>';
+  for (let day = 1; day <= days; day += 1) { const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`; const run = runsByDate.get(key); const past = key < today; const state = key === today ? 'today' : run ? 'run' : past ? 'rest' : 'upcoming'; cells += `<div class="calendar-day ${state}"><strong>${day}</strong><span>${run ? formatDistance(run.distance) : key === today ? 'วันนี้' : past ? 'พัก' : ''}</span></div>`; }
+  document.getElementById('trainingCalendar').innerHTML = cells;
 }
 
 function renderGateFlow() {
@@ -259,7 +276,6 @@ function renderGateFlow() {
   elements.firstRunGate.classList.toggle('hidden', !needsFirstRun);
   elements.goalGate.classList.toggle('hidden', !needsGoal);
   elements.dashboardWorkspace.classList.toggle('hidden', !isDashboardReady);
-  elements.quickNav.classList.toggle('hidden', !isDashboardReady);
 }
 
 function renderDashboard() {
@@ -268,6 +284,8 @@ function renderDashboard() {
   renderStats();
   renderSteps();
   renderHistory();
+  renderGoalProgress();
+  renderCalendar();
 }
 
 async function loadDashboard() {
@@ -473,6 +491,7 @@ function bootDashboard() {
   inputs.goalDate.value = getDefaultGoalDate();
   inputs.goalDate.min = getTodayKey();
   bindEvents();
+  document.getElementById('calendarTodayButton').addEventListener('click', renderCalendar);
   loadDashboard();
 }
 

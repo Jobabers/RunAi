@@ -11,6 +11,12 @@
     <a class="brand-link" href="dashboard.html" aria-label="RunAI">
       <span>RunAI</span>
     </a>
+    <nav class="topbar-nav" aria-label="หน้าหลัก">
+      <a href="profile.html">Profile</a>
+      <a href="goal.html">Goal</a>
+      <a href="run.html">Run</a>
+      <a href="history.html">History</a>
+    </nav>
     <div class="topbar-actions">
       <span class="user-pill" id="currentUserLabel">กำลังโหลด...</span>
       <button class="ghost-button" id="logoutButton" type="button">Logout</button>
@@ -24,12 +30,6 @@
         <h1 id="dashboardTitle">Dashboard</h1>
         <p id="nextActionText">กำลังตรวจสอบข้อมูลของคุณ</p>
       </div>
-      <nav class="quick-nav" aria-label="Dashboard sections">
-        <a href="#profilePanel">Profile</a>
-        <a href="#goalPanel">Goal</a>
-        <a href="#runPanel">Run</a>
-        <a href="#historyPanel">History</a>
-      </nav>
     </section>
 
     <p class="message hidden" id="dashboardMessage"></p>
@@ -48,15 +48,15 @@
         <div class="three-column dashboard-columns">
           <label class="field">
             <span>อายุ</span>
-            <input id="profileGateAgeInput" min="1" required type="number">
+            <input id="profileGateAgeInput" min="10" max="120" required type="number">
           </label>
           <label class="field">
             <span>น้ำหนัก</span>
-            <input id="profileGateWeightInput" min="1" required step="0.1" type="number">
+            <input id="profileGateWeightInput" min="20" max="400" required step="0.1" type="number">
           </label>
           <label class="field">
             <span>ส่วนสูง</span>
-            <input id="profileGateHeightInput" min="1" required step="0.1" type="number">
+            <input id="profileGateHeightInput" min="80" max="260" required step="0.1" type="number">
           </label>
         </div>
         <label class="field">
@@ -141,9 +141,9 @@
           <small>ระยะทางสะสม</small>
         </article>
         <article class="stat-card">
-          <span>Latest Run</span>
-          <strong id="latestRunStat">-</strong>
-          <small id="latestRunMeta">ยังไม่มีประวัติวิ่ง</small>
+          <span>Average Pace</span>
+          <strong id="averagePaceStat">-</strong>
+          <small id="latestRunMeta">นาทีต่อกิโลเมตร</small>
         </article>
       </section>
 
@@ -169,15 +169,15 @@
             <div class="three-column dashboard-columns">
               <label class="field">
                 <span>อายุ</span>
-                <input id="profileAgeInput" min="1" type="number">
+                <input id="profileAgeInput" min="10" max="120" type="number">
               </label>
               <label class="field">
                 <span>น้ำหนัก</span>
-                <input id="profileWeightInput" min="1" step="0.1" type="number">
+                <input id="profileWeightInput" min="20" max="400" step="0.1" type="number">
               </label>
               <label class="field">
                 <span>ส่วนสูง</span>
-                <input id="profileHeightInput" min="1" step="0.1" type="number">
+                <input id="profileHeightInput" min="80" max="260" step="0.1" type="number">
               </label>
             </div>
             <label class="field">
@@ -262,7 +262,21 @@
             <p class="eyebrow">History</p>
             <h2>ประวัติการวิ่ง</h2>
           </div>
-          <div class="history-list" id="historyList"></div>
+          <div class="run-table-wrap"><table class="run-table"><thead><tr><th>วันที่</th><th>ประเภท</th><th>ระยะทาง</th><th>เวลา</th><th>Pace</th></tr></thead><tbody id="historyList"></tbody></table></div>
+        </article>
+      </section>
+
+      <section class="dashboard-lower-grid">
+        <article class="dashboard-panel goal-progress-card">
+          <div class="panel-heading"><p class="eyebrow">Progress</p><h2>ความคืบหน้าเป้าหมาย</h2></div>
+          <div class="goal-progress-number"><strong id="goalProgressPercent">0%</strong><span id="goalProgressText">ยังไม่มีเป้าหมาย</span></div>
+          <div class="goal-progress-track"><span id="goalProgressBar"></span></div>
+        </article>
+        <article class="dashboard-panel calendar-panel">
+          <div class="panel-heading calendar-heading"><div><p class="eyebrow">Training Calendar</p><h2 id="calendarTitle">ปฏิทินการวิ่ง</h2></div><button class="ghost-button" id="calendarTodayButton" type="button">Today</button></div>
+          <div class="calendar-weekdays"><span>จ</span><span>อ</span><span>พ</span><span>พฤ</span><span>ศ</span><span>ส</span><span>อา</span></div>
+          <div class="training-calendar" id="trainingCalendar"></div>
+          <p class="calendar-legend"><span class="legend-run">●</span> วันวิ่ง <span class="legend-today">●</span> วันนี้ <span class="legend-rest">●</span> วันพัก <span class="legend-missed">●</span> วันที่พลาด</p>
         </article>
       </section>
     </div>
