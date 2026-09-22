@@ -4,7 +4,7 @@
   <header class="dashboard-topbar"><a class="brand-link" href="dashboard.html"><span>RunAI</span></a><nav class="topbar-nav" aria-label="หน้าหลัก"><a href="profile.html">Profile</a><a class="is-active" aria-current="page" href="goal.html">Goal</a><a href="run.html">Run</a><a href="history.html">History</a></nav><div class="topbar-actions"><span class="user-pill" id="currentUserLabel">กำลังโหลด...</span><button class="ghost-button" id="logoutButton" type="button">Logout</button></div></header>
   <main class="dashboard-page feature-page">
     <a class="profile-back-link" href="dashboard.html">← กลับไป Dashboard</a>
-    <section class="feature-hero"><div><p class="eyebrow">Goal</p><h1>ตั้งเป้าหมายใหม่</h1><p>กำหนดปลายทางของการวิ่ง แล้วค่อยพัฒนาทีละก้าว</p></div><div class="hero-kicker">🎯<span>Focus<br>your run</span></div></section>
+    <section class="feature-hero"><div><p class="eyebrow">Main Goal</p><h1>ตั้งเป้าหมายหลัก</h1><p>กำหนดปลายทางของการวิ่ง โดยหนึ่งคนมี Active Goal ได้ครั้งละหนึ่งเป้าหมาย</p></div><div class="hero-kicker">🎯<span>Focus<br>your run</span></div></section>
     <p class="message hidden" id="pageMessage" role="status"></p>
     <section class="feature-layout">
       <section class="dashboard-panel feature-form-panel"><div class="panel-heading"><p class="eyebrow">New goal</p><h2>รายละเอียดเป้าหมาย</h2></div><p class="form-note hidden" id="goalLockedNote">คุณมี Active Goal อยู่แล้ว ให้ทำเป้าหมายนี้ให้สำเร็จก่อนสร้างเป้าหมายใหม่</p>
@@ -14,7 +14,7 @@
           <label class="field"><span>วันที่เป้าหมาย</span><input id="goalDateInput" required type="date"></label><button class="primary-button feature-submit" type="submit">บันทึกเป้าหมาย</button>
         </form>
       </section>
-      <aside class="feature-tip"><p class="eyebrow">Good to know</p><h2>เป้าหมายที่ดี เริ่มจากความจริง</h2><p>เลือกระยะและวันที่ที่ท้าทายได้ แต่ควรเพิ่มจากระดับเดิมทีละน้อยเพื่อให้วิ่งได้ต่อเนื่อง</p><div class="tip-line"><span>01</span> ดูประวัติการวิ่งล่าสุดก่อนตั้งเป้า</div><div class="tip-line"><span>02</span> ระบุวันให้ตัวเองได้เตรียมตัว</div></aside>
+      <aside class="feature-tip"><p class="eyebrow">Good to know</p><h2>เป้าหมายที่ดี เริ่มจากความจริง</h2><p>เลือกระยะและวันที่ที่ท้าทายได้ แต่ควรเพิ่มจากระดับเดิมทีละน้อยเพื่อให้วิ่งได้ต่อเนื่อง</p><div class="tip-line"><span>01</span> ดู Running Record ล่าสุดก่อนตั้งเป้า</div><div class="tip-line"><span>02</span> ทำ Active Goal เดิมให้จบก่อนสร้างใหม่</div></aside>
     </section>
     <section class="dashboard-panel compact-list-panel"><div class="panel-heading"><p class="eyebrow">Your goals</p><h2>เป้าหมายที่ผ่านมา</h2></div><div id="goalList" class="goal-list"><p class="empty-state">กำลังโหลดเป้าหมาย...</p></div></section>
   </main><script src="goal.js"></script>
