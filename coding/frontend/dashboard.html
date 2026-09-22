@@ -124,11 +124,17 @@
     </section>
 
     <div class="dashboard-workspace" id="dashboardWorkspace">
-      <section class="stats-grid" aria-label="Running summary">
-        <article class="stat-card">
+      <section class="stats-grid dashboard-summary-grid" aria-label="Running summary">
+        <article class="stat-card active-goal-card">
           <span>Active Goal</span>
           <strong id="activeGoalStat">-</strong>
+          <div class="mini-progress-track"><span id="activeGoalBar"></span></div>
           <small id="activeGoalMeta">ยังไม่มีเป้าหมาย</small>
+        </article>
+        <article class="stat-card">
+          <span>Weekly Distance</span>
+          <strong id="weeklyDistanceStat">0 km</strong>
+          <small id="weeklyDistanceMeta">สัปดาห์นี้</small>
         </article>
         <article class="stat-card">
           <span>Total Runs</span>
@@ -136,24 +142,99 @@
           <small>รายการที่บันทึกแล้ว</small>
         </article>
         <article class="stat-card">
-          <span>Total Distance</span>
-          <strong id="totalDistanceStat">0 km</strong>
-          <small>ระยะทางสะสม</small>
-        </article>
-        <article class="stat-card">
           <span>Average Pace</span>
           <strong id="averagePaceStat">-</strong>
           <small id="latestRunMeta">นาทีต่อกิโลเมตร</small>
         </article>
+        <article class="stat-card foundation-action-card">
+          <span>Sprint 1 Action</span>
+          <strong id="foundationActionStat">Add Record</strong>
+          <small id="foundationActionMeta">บันทึก Running Record เพื่อใช้วิเคราะห์พื้นฐาน</small>
+          <button class="primary-button compact-action-button" id="quickRecordButton" type="button">Add Record</button>
+        </article>
       </section>
 
-      <section class="dashboard-grid" aria-label="Sprint 1 workspace">
-        <article class="dashboard-panel progress-panel">
-          <div class="panel-heading">
-            <p class="eyebrow">Checklist</p>
-            <h2>สถานะ Sprint 1</h2>
+      <section class="dashboard-main-grid" aria-label="Running foundation overview">
+        <article class="dashboard-panel calendar-panel dashboard-calendar-main">
+          <div class="panel-heading calendar-heading">
+            <div>
+              <p class="eyebrow">Running Calendar</p>
+              <h2 id="calendarTitle">ปฏิทินการวิ่ง</h2>
+              <p class="calendar-summary" id="calendarSummary">กำลังโหลดปฏิทิน...</p>
+            </div>
+            <div class="calendar-controls" aria-label="ควบคุมปฏิทิน">
+              <button class="ghost-button calendar-nav-button" id="calendarPrevButton" type="button" aria-label="เดือนก่อนหน้า">‹</button>
+              <button class="ghost-button" id="calendarTodayButton" type="button">Today</button>
+              <button class="ghost-button calendar-nav-button" id="calendarNextButton" type="button" aria-label="เดือนถัดไป">›</button>
+            </div>
           </div>
-          <ol class="step-list" id="stepList"></ol>
+          <div class="calendar-weekdays"><span>จ</span><span>อ</span><span>พ</span><span>พฤ</span><span>ศ</span><span>ส</span><span>อา</span></div>
+          <div class="training-calendar" id="trainingCalendar" aria-live="polite"></div>
+          <div class="calendar-legend" aria-label="คำอธิบายสถานะ">
+            <span><i class="legend-run"></i> Completed</span>
+            <span><i class="legend-today"></i> Today</span>
+            <span><i class="legend-plan"></i> Plan Preview</span>
+            <span><i class="legend-rest"></i> Rest</span>
+          </div>
+        </article>
+
+        <aside class="dashboard-side-stack" aria-label="Recent activity and progress">
+          <article class="dashboard-panel recent-runs-panel">
+            <div class="panel-heading side-panel-heading">
+              <div>
+                <p class="eyebrow">Recent Runs</p>
+                <h2>วิ่งล่าสุด</h2>
+              </div>
+              <a class="panel-link" href="history.html">See All</a>
+            </div>
+            <div class="recent-run-list" id="recentRunsList"></div>
+          </article>
+
+          <article class="dashboard-panel progress-chart-panel">
+            <div class="panel-heading side-panel-heading">
+              <div>
+                <p class="eyebrow">Progress</p>
+                <h2>ระยะทางล่าสุด</h2>
+              </div>
+              <span class="panel-link" id="progressChartMeta">Distance</span>
+            </div>
+            <div class="progress-chart-bars" id="progressChartBars"></div>
+          </article>
+        </aside>
+      </section>
+
+      <section class="dashboard-detail-grid" aria-label="Profile, goal, and history">
+        <article class="dashboard-panel" id="runPanel">
+          <div class="panel-heading">
+            <p class="eyebrow">Run</p>
+            <h2>บันทึก Running Record</h2>
+          </div>
+          <form class="dashboard-form" id="runForm">
+            <label class="field">
+              <span>วันที่วิ่ง</span>
+              <input id="runDateInput" required type="date">
+            </label>
+            <div class="two-column dashboard-columns">
+              <label class="field">
+                <span>ระยะทาง</span>
+                <input id="runDistanceInput" min="0.1" placeholder="km" required step="0.1" type="number">
+              </label>
+              <label class="field">
+                <span>เวลาที่ใช้</span>
+                <input id="runDurationInput" min="1" placeholder="minutes" required type="number">
+              </label>
+            </div>
+            <label class="field">
+              <span>ประเภทการวิ่ง</span>
+              <select id="runTypeInput">
+                <option value="Easy Run">Easy Run</option>
+                <option value="Long Run">Long Run</option>
+                <option value="Tempo Run">Tempo Run</option>
+                <option value="Recovery Run">Recovery Run</option>
+              </select>
+            </label>
+            <button class="primary-button" type="submit">Save Record</button>
+          </form>
         </article>
 
         <article class="dashboard-panel" id="profilePanel">
@@ -197,6 +278,7 @@
             <p class="eyebrow">Goal</p>
             <h2>เป้าหมายการวิ่ง</h2>
           </div>
+          <p class="form-note hidden" id="goalLockedNote">คุณมี Active Goal อยู่แล้ว ให้ทำเป้าหมายนี้ให้สำเร็จก่อนสร้างเป้าหมายใหม่</p>
           <form class="dashboard-form" id="goalForm">
             <label class="field">
               <span>ประเภทเป้าหมาย</span>
@@ -224,76 +306,12 @@
           </form>
         </article>
 
-        <article class="dashboard-panel" id="runPanel">
-          <div class="panel-heading">
-            <p class="eyebrow">Run</p>
-            <h2>บันทึกการวิ่ง</h2>
-          </div>
-          <form class="dashboard-form" id="runForm">
-            <label class="field">
-              <span>วันที่วิ่ง</span>
-              <input id="runDateInput" required type="date">
-            </label>
-            <div class="two-column dashboard-columns">
-              <label class="field">
-                <span>ระยะทาง</span>
-                <input id="runDistanceInput" min="0.1" placeholder="km" required step="0.1" type="number">
-              </label>
-              <label class="field">
-                <span>เวลาที่ใช้</span>
-                <input id="runDurationInput" min="1" placeholder="minutes" required type="number">
-              </label>
-            </div>
-            <label class="field">
-              <span>ประเภทการวิ่ง</span>
-              <select id="runTypeInput">
-                <option value="Easy Run">Easy Run</option>
-                <option value="Long Run">Long Run</option>
-                <option value="Tempo Run">Tempo Run</option>
-                <option value="Recovery Run">Recovery Run</option>
-              </select>
-            </label>
-            <button class="primary-button" type="submit">Save Run</button>
-          </form>
-        </article>
-
         <article class="dashboard-panel history-panel" id="historyPanel">
           <div class="panel-heading">
             <p class="eyebrow">History</p>
             <h2>ประวัติการวิ่ง</h2>
           </div>
           <div class="run-table-wrap"><table class="run-table"><thead><tr><th>วันที่</th><th>ประเภท</th><th>ระยะทาง</th><th>เวลา</th><th>Pace</th></tr></thead><tbody id="historyList"></tbody></table></div>
-        </article>
-      </section>
-
-      <section class="dashboard-lower-grid">
-        <article class="dashboard-panel goal-progress-card">
-          <div class="panel-heading"><p class="eyebrow">Progress</p><h2>ความคืบหน้าเป้าหมาย</h2></div>
-          <div class="goal-progress-number"><strong id="goalProgressPercent">0%</strong><span id="goalProgressText">ยังไม่มีเป้าหมาย</span></div>
-          <div class="goal-progress-track"><span id="goalProgressBar"></span></div>
-        </article>
-        <article class="dashboard-panel calendar-panel">
-          <div class="panel-heading calendar-heading">
-            <div>
-              <p class="eyebrow">Training Calendar</p>
-              <h2 id="calendarTitle">ปฏิทินการวิ่ง</h2>
-              <p class="calendar-summary" id="calendarSummary">กำลังโหลดปฏิทิน...</p>
-            </div>
-            <div class="calendar-controls" aria-label="ควบคุมปฏิทิน">
-              <button class="ghost-button calendar-nav-button" id="calendarPrevButton" type="button" aria-label="เดือนก่อนหน้า">‹</button>
-              <button class="ghost-button" id="calendarTodayButton" type="button">Today</button>
-              <button class="ghost-button calendar-nav-button" id="calendarNextButton" type="button" aria-label="เดือนถัดไป">›</button>
-            </div>
-          </div>
-          <div class="calendar-weekdays"><span>จ</span><span>อ</span><span>พ</span><span>พฤ</span><span>ศ</span><span>ส</span><span>อา</span></div>
-          <div class="training-calendar" id="trainingCalendar" aria-live="polite"></div>
-          <div class="calendar-legend" aria-label="คำอธิบายสถานะ">
-            <span><i class="legend-run"></i> Completed</span>
-            <span><i class="legend-today"></i> Today</span>
-            <span><i class="legend-plan"></i> Upcoming</span>
-            <span><i class="legend-rest"></i> Rest</span>
-            <span><i class="legend-missed"></i> Missed</span>
-          </div>
         </article>
       </section>
     </div>

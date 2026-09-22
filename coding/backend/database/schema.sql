@@ -166,6 +166,10 @@ create unique index if not exists uq_training_plans_one_active_per_user
   on training_plans (user_id)
   where status = 'active';
 
+create unique index if not exists uq_goals_one_active_per_user
+  on goals (user_id)
+  where status = 'active';
+
 create index if not exists idx_goals_user_status on goals (user_id, status);
 create index if not exists idx_runs_user_date on runs (user_id, run_date desc);
 create index if not exists idx_training_sessions_plan_date on training_sessions (training_plan_id, session_date);

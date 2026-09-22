@@ -121,6 +121,19 @@ test('supports the first RunAI quest workflow', async (t) => {
   });
   assert.equal(goal.response.status, 201);
 
+  const duplicateGoal = await request(baseUrl, '/goals', {
+    method: 'POST',
+    token,
+    body: {
+      goal_type: 'วิ่ง 10K ให้ดีขึ้น',
+      target_distance: 10,
+      target_duration_minutes: 65,
+      target_date: addDays(toDateKey(), 45),
+    },
+  });
+  assert.equal(duplicateGoal.response.status, 409);
+  assert.match(duplicateGoal.data.error.message, /เป้าหมายที่กำลังใช้งาน/);
+
   const plan = await request(baseUrl, '/training-plans/generate', {
     method: 'POST',
     token,

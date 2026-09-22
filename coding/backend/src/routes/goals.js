@@ -35,6 +35,9 @@ router.post('/goals', async (req, res, next) => {
     const runs = await store.listRunsForUser(req.user.user_id);
     assertCondition(runs.length >= 1, 400, 'ต้องมีประวัติการวิ่งอย่างน้อย 1 รายการก่อนสร้าง Goal');
 
+    const activeGoal = await store.findActiveGoal(req.user.user_id);
+    assertCondition(!activeGoal, 409, 'คุณมีเป้าหมายที่กำลังใช้งานอยู่แล้ว');
+
     const goal = await store.createRecord('goals', {
       user_id: req.user.user_id,
       goal_type: String(goal_type),
