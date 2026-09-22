@@ -17,8 +17,8 @@ function render(runs) {
   const distance = runs.reduce((sum, run) => sum + Number(run.distance || 0), 0);
   const duration = runs.reduce((sum, run) => sum + Number(run.duration_minutes || 0), 0);
   el('totalRuns').textContent = runs.length; el('totalDistance').textContent = formatDistance(distance);
-  el('averagePace').textContent = distance ? `${(duration / distance).toFixed(1)} min` : '-';
-  el('historyList').innerHTML = runs.length ? runs.map((run) => `<div class="history-item history-row"><div><strong>${formatDistance(run.distance)}</strong><small>${run.run_type || 'Easy Run'} · ${formatDate(run.run_date)}</small></div><span>${Number(run.duration_minutes)} min</span></div>`).join('') : '<p class="empty-state">ยังไม่มีประวัติการวิ่ง เริ่มบันทึกการวิ่งครั้งแรกได้เลย</p>';
+  el('averagePace').textContent = distance ? `${(duration / distance).toFixed(1)} min/km` : '-';
+  el('historyList').innerHTML = runs.length ? runs.map((run) => `<div class="history-item history-row"><div><strong>${formatDistance(run.distance)}</strong><small>${run.run_type || 'Easy Run'} · ${formatDate(run.run_date)}</small></div><span>${Number(run.duration_minutes)} min</span></div>`).join('') : '<p class="empty-state">ยังไม่มี Running Record เริ่มบันทึกครั้งแรกได้เลย</p>';
 }
 async function load() {
   try { const [me, runs] = await Promise.all([api('/me'), api('/runs')]); el('currentUserLabel').textContent = `${me.user.name || 'Runner'} · ${me.user.email || ''}`; render(runs.runs || []); }

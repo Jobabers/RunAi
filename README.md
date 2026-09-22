@@ -1,18 +1,19 @@
 # RunAI
 
-RunAI is a web application for planning running training with AI-assisted training plans, daily quests, and a feedback loop after each quest result.
+RunAI is a web application for improving running performance with AI-assisted training plans, daily quests, and a feedback loop after each quest result.
 
-## Current MVP
+## Current Sprint 1 MVP
 
 - Backend API with Express
-- In-memory development storage
+- In-memory development storage for tests
 - Supabase PostgreSQL schema in `coding/backend/database/schema.sql`
 - Authentication through Supabase Auth
-- Goal and running history APIs
-- AI placeholder service for generating and adjusting training plans
-- Daily quest submission rules
+- Profile, active goal, and running record APIs
+- History and progress summaries for Sprint 1
+- Active goal rule: one user can have only one active goal
+- Rule-based planner and daily quest APIs are present for later sprints, but the Sprint 1 UI stays focused on foundation data
 - Plain HTML/CSS/JavaScript frontend connected to the API
-- Current frontend screen set: login, register, and Sprint 1 dashboard
+- Current frontend screen set: login, register, profile, goal, run, history, and Sprint 1 dashboard
 - First dashboard flow: Profile -> First Run -> Goal -> full Sprint 1 dashboard
 
 Note: the backend runs with in-memory storage by default for local development. Set `STORAGE_DRIVER=supabase` and provide Supabase credentials to use persistent storage.
@@ -90,6 +91,14 @@ If this Supabase project already has the old RunAI tables with `public.users` an
 
 Use `coding/backend/database/reset_for_supabase_auth.sql` only for dev/test data because it drops existing RunAI tables without keeping backups.
 
+For the current Sprint 1 schema, make sure this index exists in Supabase so the database also enforces one active goal per user:
+
+```sql
+create unique index if not exists uq_goals_one_active_per_user
+  on goals (user_id)
+  where status = 'active';
+```
+
 ### 5. Start the Project
 
 Recommended: run backend and frontend together from the project root:
@@ -153,10 +162,17 @@ node --check server.js
 
 The frontend starts from authentication, then redirects logged-in users to `dashboard.html`. New users must complete Profile, enter their first run distance and duration, then create a Goal before the full Sprint 1 dashboard is unlocked.
 
-## Core Rules Preserved
+## Sprint 1 Scope
 
 - Users must log in before using main features.
 - Users must complete Profile before First Run and Goal.
+- Users must add at least one Running Record before creating a Goal.
+- Running Records are history data and can be added multiple times per day.
+- One user can have only one active goal.
+- Sprint 1 covers Auth/Profile, Goal, Running Record, History, and Progress.
+
+## Later Sprint Rules Preserved
+
 - Users need at least one run before generating the first training plan.
 - One user can have only one active training plan.
 - `training_sessions` are daily quests; there is no separate `quests` table.
