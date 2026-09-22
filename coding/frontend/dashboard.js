@@ -15,13 +15,20 @@ const elements = {
   dashboardWorkspace: document.getElementById('dashboardWorkspace'),
   activeGoalStat: document.getElementById('activeGoalStat'),
   activeGoalMeta: document.getElementById('activeGoalMeta'),
+  activeGoalBar: document.getElementById('activeGoalBar'),
+  weeklyDistanceStat: document.getElementById('weeklyDistanceStat'),
+  weeklyDistanceMeta: document.getElementById('weeklyDistanceMeta'),
   totalRunsStat: document.getElementById('totalRunsStat'),
-  totalDistanceStat: document.getElementById('totalDistanceStat'),
-  latestRunStat: document.getElementById('latestRunStat'),
   averagePaceStat: document.getElementById('averagePaceStat'),
   latestRunMeta: document.getElementById('latestRunMeta'),
-  stepList: document.getElementById('stepList'),
+  foundationActionStat: document.getElementById('foundationActionStat'),
+  foundationActionMeta: document.getElementById('foundationActionMeta'),
+  quickRecordButton: document.getElementById('quickRecordButton'),
+  recentRunsList: document.getElementById('recentRunsList'),
+  progressChartBars: document.getElementById('progressChartBars'),
+  progressChartMeta: document.getElementById('progressChartMeta'),
   historyList: document.getElementById('historyList'),
+  goalLockedNote: document.getElementById('goalLockedNote'),
   calendarTitle: document.getElementById('calendarTitle'),
   calendarSummary: document.getElementById('calendarSummary'),
   trainingCalendar: document.getElementById('trainingCalendar'),
@@ -161,6 +168,28 @@ function getActiveGoal(goals) {
   return goals.find((goal) => goal.status === 'active') || null;
 }
 
+function getGoalProgressPercent(goal, runs) {
+  const totalDistance = runs.reduce((sum, run) => sum + Number(run.distance || 0), 0);
+  const targetDistance = Number(goal?.target_distance || 0);
+
+  if (!targetDistance) return 0;
+  return Math.min(100, Math.round((totalDistance / targetDistance) * 100));
+}
+
+function getWeekRange() {
+  const today = new Date();
+  const dayIndex = (today.getDay() + 6) % 7;
+  const start = new Date(today);
+  start.setDate(today.getDate() - dayIndex);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+
+  return {
+    start: toDateInputValue(start),
+    end: toDateInputValue(end),
+  };
+}
+
 function isProfileComplete(user) {
   return Boolean(user?.name && user?.age && user?.weight && user?.height);
 }
@@ -186,22 +215,32 @@ function renderStats() {
   const { goals, runs, user } = dashboardState;
   const activeGoal = getActiveGoal(goals);
   const totalDistance = runs.reduce((sum, run) => sum + Number(run.distance || 0), 0);
-  const latestRun = runs[0] || null;
   const totalDuration = runs.reduce((sum, run) => sum + Number(run.duration_minutes || 0), 0);
+  const goalPercent = getGoalProgressPercent(activeGoal, runs);
+  const week = getWeekRange();
+  const weeklyDistance = runs
+    .filter((run) => run.run_date >= week.start && run.run_date <= week.end)
+    .reduce((sum, run) => sum + Number(run.distance || 0), 0);
 
   elements.totalRunsStat.textContent = String(runs.length);
-  elements.totalDistanceStat.textContent = formatDistance(totalDistance);
+  elements.weeklyDistanceStat.textContent = formatDistance(weeklyDistance);
+  elements.weeklyDistanceMeta.textContent = `${formatDate(week.start)} - ${formatDate(week.end)}`;
 
   if (activeGoal) {
     elements.activeGoalStat.textContent = formatDistance(activeGoal.target_distance);
-    elements.activeGoalMeta.textContent = `ภายใน ${formatDate(activeGoal.target_date)}`;
+    elements.activeGoalMeta.textContent = `${goalPercent}% · ภายใน ${formatDate(activeGoal.target_date)}`;
   } else {
     elements.activeGoalStat.textContent = '-';
     elements.activeGoalMeta.textContent = 'ยังไม่มีเป้าหมาย';
   }
+  elements.activeGoalBar.style.width = `${goalPercent}%`;
 
   elements.averagePaceStat.textContent = totalDistance ? formatPace(totalDistance, totalDuration).replace(' /km', '') : '-';
   elements.latestRunMeta.textContent = totalDistance ? 'นาทีต่อกิโลเมตร' : 'ยังไม่มีประวัติวิ่ง';
+  elements.foundationActionStat.textContent = runs.length ? 'Add Record' : 'First Record';
+  elements.foundationActionMeta.textContent = runs.length
+    ? `มี Running Record ${runs.length} รายการสำหรับดูพัฒนาการ`
+    : 'บันทึกการวิ่งครั้งแรกเพื่อเริ่มดูพัฒนาการ';
 
   if (!isProfileComplete(user)) {
     elements.nextActionText.textContent = 'เริ่มจากกรอกข้อมูลพื้นฐานให้ครบก่อน';
@@ -214,40 +253,14 @@ function renderStats() {
   }
 }
 
-function renderSteps() {
-  const { user, goals, runs } = dashboardState;
-  const steps = [
-    {
-      done: true,
-      label: 'US-01 บัญชีและ Profile',
-      detail: isProfileComplete(user) ? 'เข้าสู่ระบบและ Profile ครบแล้ว' : 'กรอกข้อมูล Profile ให้ครบ',
-    },
-    {
-      done: Boolean(getActiveGoal(goals)),
-      label: 'US-02 เป้าหมายการวิ่ง',
-      detail: getActiveGoal(goals) ? 'มี Goal active แล้ว' : 'สร้าง Goal หลังมี First Run',
-    },
-    {
-      done: runs.length > 0,
-      label: 'US-03 ประวัติการวิ่ง',
-      detail: runs.length ? `บันทึกแล้ว ${runs.length} รายการ` : 'บันทึก First Run ก่อน',
-    },
-    {
-      done: isProfileComplete(user) && runs.length > 0 && Boolean(getActiveGoal(goals)),
-      label: 'US-04 ดูประวัติและพัฒนาการ',
-      detail: 'สรุประยะทาง จำนวนครั้ง และ run ล่าสุด',
-    },
-  ];
+function renderGoalFormState() {
+  const activeGoal = getActiveGoal(dashboardState.goals);
+  const isLocked = Boolean(activeGoal);
 
-  elements.stepList.innerHTML = steps.map((step) => `
-    <li class="${step.done ? 'done' : ''}">
-      <span class="step-marker">${step.done ? '✓' : ''}</span>
-      <div>
-        <strong>${step.label}</strong>
-        <small>${step.detail}</small>
-      </div>
-    </li>
-  `).join('');
+  elements.goalLockedNote.classList.toggle('hidden', !isLocked);
+  elements.goalForm.querySelectorAll('input, select, button').forEach((control) => {
+    control.disabled = isLocked;
+  });
 }
 
 function renderHistory() {
@@ -259,13 +272,49 @@ function renderHistory() {
   elements.historyList.innerHTML = dashboardState.runs.map((run) => `<tr><td>${formatDate(run.run_date)}</td><td>${run.run_type || 'Easy Run'}</td><td>${formatDistance(run.distance)}</td><td>${Number(run.duration_minutes)} min</td><td>${formatPace(run.distance, run.duration_minutes)}</td></tr>`).join('');
 }
 
-function renderGoalProgress() {
-  const goal = getActiveGoal(dashboardState.goals);
-  const total = dashboardState.runs.reduce((sum, run) => sum + Number(run.distance || 0), 0);
-  const percent = goal ? Math.min(100, Math.round(total / Number(goal.target_distance) * 100)) : 0;
-  document.getElementById('goalProgressPercent').textContent = `${percent}%`;
-  document.getElementById('goalProgressText').textContent = goal ? `${formatDistance(total)} จาก ${formatDistance(goal.target_distance)}` : 'ยังไม่มีเป้าหมาย';
-  document.getElementById('goalProgressBar').style.width = `${percent}%`;
+function renderRecentRuns() {
+  if (!dashboardState.runs.length) {
+    elements.recentRunsList.innerHTML = '<p class="empty-state compact-empty-state">ยังไม่มีประวัติการวิ่ง</p>';
+    return;
+  }
+
+  elements.recentRunsList.innerHTML = dashboardState.runs.slice(0, 5).map((run) => `
+    <div class="recent-run-item">
+      <span class="run-dot"></span>
+      <div>
+        <strong>${formatDate(run.run_date)}</strong>
+        <small>${escapeHtml(run.run_type || 'Easy Run')}</small>
+      </div>
+      <div class="recent-run-metrics">
+        <strong>${formatDistance(run.distance)}</strong>
+        <small>${formatPace(run.distance, run.duration_minutes).replace(' /km', '/km')}</small>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderProgressChart() {
+  if (!dashboardState.runs.length) {
+    elements.progressChartBars.innerHTML = '<p class="empty-state compact-empty-state">ยังไม่มีข้อมูลสำหรับกราฟ</p>';
+    elements.progressChartMeta.textContent = 'Distance';
+    return;
+  }
+
+  const chartRuns = [...dashboardState.runs]
+    .slice(0, 8)
+    .reverse();
+  const maxDistance = Math.max(...chartRuns.map((run) => Number(run.distance || 0)), 1);
+
+  elements.progressChartMeta.textContent = `${chartRuns.length} runs`;
+  elements.progressChartBars.innerHTML = chartRuns.map((run) => {
+    const height = Math.max(8, Math.round((Number(run.distance || 0) / maxDistance) * 100));
+    return `
+      <div class="progress-bar-item" title="${escapeHtml(formatDate(run.run_date))} · ${formatDistance(run.distance)}">
+        <span style="--bar-height: ${height}%"></span>
+        <small>${escapeHtml(formatDistance(run.distance).replace(' km', ''))}</small>
+      </div>
+    `;
+  }).join('');
 }
 
 function getMonthKey(date) {
@@ -301,7 +350,6 @@ function getPlanSessionsByDate(plan) {
 
 function getCalendarCell({ key, day, outsideMonth, run, session, today }) {
   const isToday = key === today;
-  const isPast = key < today;
   let state = 'rest';
   let label = 'Rest';
   let detail = '';
@@ -309,18 +357,8 @@ function getCalendarCell({ key, day, outsideMonth, run, session, today }) {
   if (session) {
     const targetDistance = Number(session.target_distance || 0);
     label = `${session.training_type || 'Run'}${targetDistance ? ` ${formatDistance(targetDistance)}` : ''}`;
-    detail = session.status || 'planned';
-
-    if (session.status === 'expired' || session.status === 'failed' || (isPast && !run)) {
-      state = 'missed';
-      detail = 'Missed';
-    } else if (session.status === 'locked') {
-      state = 'upcoming';
-      detail = 'Upcoming';
-    } else {
-      state = isToday ? 'today' : 'planned';
-      detail = isToday ? 'Today' : 'Planned';
-    }
+    state = targetDistance ? (isToday ? 'today planned' : 'planned') : 'rest';
+    detail = targetDistance ? 'Plan preview' : 'Rest';
   }
 
   if (run) {
@@ -357,16 +395,11 @@ function renderCalendar() {
   const monthSessions = [...sessionsByDate.values()].filter((session) => String(session.session_date).startsWith(monthKey));
   const completedCount = monthRuns.length;
   const plannedCount = monthSessions.length;
-  const missedCount = monthSessions.filter((session) => (
-    session.status === 'expired'
-    || session.status === 'failed'
-    || (session.session_date < today && !runsByDate.has(session.session_date))
-  )).length;
 
   elements.calendarTitle.textContent = monthFormatter.format(calendarCursor);
   elements.calendarSummary.textContent = plannedCount
-    ? `${completedCount} completed · ${plannedCount} planned · ${missedCount} missed`
-    : `${completedCount} completed runs · no active training plan yet`;
+    ? `${completedCount} running records · ${plannedCount} plan preview days`
+    : `${completedCount} running records · Sprint 1 foundation`;
 
   const cells = [];
   for (let index = 0; index < 42; index += 1) {
@@ -407,9 +440,10 @@ function renderDashboard() {
   renderUser(dashboardState.user);
   renderGateFlow();
   renderStats();
-  renderSteps();
+  renderGoalFormState();
   renderHistory();
-  renderGoalProgress();
+  renderRecentRuns();
+  renderProgressChart();
   renderCalendar();
 }
 
@@ -588,7 +622,7 @@ async function handleRunSubmit(event) {
     });
     elements.runForm.reset();
     inputs.runDate.value = getTodayKey();
-    showDashboardMessage('บันทึก Run แล้ว');
+    showDashboardMessage('บันทึก Running Record แล้ว');
     await loadDashboard();
   } catch (error) {
     showDashboardMessage(error.message, 'error');
@@ -614,6 +648,10 @@ function bindEvents() {
   elements.calendarNextButton.addEventListener('click', () => {
     calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() + 1, 1);
     renderCalendar();
+  });
+  elements.quickRecordButton.addEventListener('click', () => {
+    document.getElementById('runPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    inputs.runDistance.focus({ preventScroll: true });
   });
 }
 

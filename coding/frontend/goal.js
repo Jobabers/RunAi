@@ -14,6 +14,13 @@ async function api(path, options = {}) {
 function dateValue(date) { return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
 function formatDate(value) { return new Intl.DateTimeFormat('th-TH', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${value}T00:00:00`)); }
 function formatDistance(value) { return `${Number(value).toFixed(Number(value) % 1 ? 1 : 0)} km`; }
+function setGoalFormState(goals) {
+  const hasActiveGoal = goals.some((goal) => goal.status === 'active');
+  el('goalLockedNote').classList.toggle('hidden', !hasActiveGoal);
+  el('goalForm').querySelectorAll('input, select, button').forEach((control) => {
+    control.disabled = hasActiveGoal;
+  });
+}
 function renderGoals(goals) {
   el('goalList').innerHTML = goals.length ? goals.map((goal) => `<div class="goal-item"><div><strong>${formatDistance(goal.target_distance)}</strong><small>${goal.goal_type || 'เป้าหมายการวิ่ง'} · ${formatDate(goal.target_date)}</small></div><span class="goal-status ${goal.status === 'active' ? 'active' : ''}">${goal.status === 'active' ? 'กำลังทำ' : 'สำเร็จแล้ว'}</span></div>`).join('') : '<p class="empty-state">ยังไม่มีเป้าหมาย ลองสร้างเป้าหมายแรกของคุณ</p>';
 }
@@ -21,7 +28,9 @@ async function load() {
   try {
     const [me, goals] = await Promise.all([api('/me'), api('/goals')]);
     el('currentUserLabel').textContent = `${me.user.name || 'Runner'} · ${me.user.email || ''}`;
-    renderGoals(goals.goals || []);
+    const userGoals = goals.goals || [];
+    renderGoals(userGoals);
+    setGoalFormState(userGoals);
   } catch (error) { show(error.message, 'error'); }
 }
 el('logoutButton').addEventListener('click', logout);
