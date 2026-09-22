@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="th"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Run | RunAI</title><link rel="stylesheet" href="styles.css"></head>
+<body class="dashboard-body">
+  <header class="dashboard-topbar"><a class="brand-link" href="dashboard.html"><span>RunAI</span></a><nav class="topbar-nav" aria-label="หน้าหลัก"><a href="profile.html">Profile</a><a href="goal.html">Goal</a><a class="is-active" aria-current="page" href="run.html">Run</a><a href="history.html">History</a></nav><div class="topbar-actions"><span class="user-pill" id="currentUserLabel">กำลังโหลด...</span><button class="ghost-button" id="logoutButton" type="button">Logout</button></div></header>
+  <main class="dashboard-page feature-page">
+    <a class="profile-back-link" href="dashboard.html">← กลับไป Dashboard</a>
+    <section class="feature-hero"><div><p class="eyebrow">Run</p><h1>บันทึกการวิ่ง</h1><p>ทุกครั้งที่วิ่งคือข้อมูลสำคัญของการพัฒนา</p></div><div class="hero-kicker">🏃<span>Keep<br>moving</span></div></section>
+    <p class="message hidden" id="pageMessage" role="status"></p>
+    <section class="feature-layout">
+      <section class="dashboard-panel feature-form-panel"><div class="panel-heading"><p class="eyebrow">New activity</p><h2>รายละเอียดการวิ่ง</h2></div>
+        <form class="dashboard-form" id="runForm">
+          <label class="field"><span>วันที่วิ่ง</span><input id="runDateInput" required type="date"></label>
+          <div class="two-column dashboard-columns"><label class="field"><span>ระยะทาง</span><input id="runDistanceInput" min="0.1" step="0.1" required type="number" placeholder="km"></label><label class="field"><span>เวลาที่ใช้</span><input id="runDurationInput" min="1" required type="number" placeholder="minutes"></label></div>
+          <label class="field"><span>ประเภทการวิ่ง</span><select id="runTypeInput"><option value="Easy Run">Easy Run</option><option value="Long Run">Long Run</option><option value="Tempo Run">Tempo Run</option><option value="Recovery Run">Recovery Run</option></select></label><button class="primary-button feature-submit" type="submit">บันทึกการวิ่ง</button>
+        </form>
+      </section>
+      <aside class="feature-tip"><p class="eyebrow">Run tip</p><h2>สม่ำเสมอสำคัญกว่าหนัก</h2><p>บันทึกทั้งวันที่ ระยะ และเวลา เพื่อให้เห็นพัฒนาการที่แท้จริงของตัวเอง</p><div class="tip-line"><span>01</span> เริ่มช้าได้ แต่ต้องเริ่ม</div><div class="tip-line"><span>02</span> พักเมื่อร่างกายต้องการ</div></aside>
+    </section>
+  </main><script src="run.js"></script>
+</body></html>

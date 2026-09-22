@@ -29,6 +29,7 @@ router.post('/goals', async (req, res, next) => {
     assertCondition(goal_type, 400, 'กรุณาระบุประเภทเป้าหมาย');
     assertCondition(Number(target_distance) > 0, 400, 'ระยะทางเป้าหมายต้องมากกว่า 0');
     assertCondition(target_date, 400, 'กรุณาระบุวันที่ต้องการบรรลุเป้าหมาย');
+    assertCondition(new Date(`${target_date}T00:00:00`) > new Date(new Date().toDateString()), 400, 'วันที่เป้าหมายต้องเป็นวันในอนาคต');
     assertCondition(isProfileComplete(req.user), 400, 'กรุณากรอกข้อมูล Profile ให้ครบก่อนสร้าง Goal');
 
     const runs = await store.listRunsForUser(req.user.user_id);

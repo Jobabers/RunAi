@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profile | RunAI</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="dashboard-body">
+  <header class="dashboard-topbar">
+    <a class="brand-link" href="dashboard.html" aria-label="กลับไปหน้า Dashboard"><span>RunAI</span></a>
+    <nav class="topbar-nav" aria-label="หน้าหลัก"><a class="is-active" aria-current="page" href="profile.html">Profile</a><a href="goal.html">Goal</a><a href="run.html">Run</a><a href="history.html">History</a></nav>
+    <div class="topbar-actions">
+      <span class="user-pill" id="currentUserLabel">กำลังโหลด...</span>
+      <button class="ghost-button" id="logoutButton" type="button">Logout</button>
+    </div>
+  </header>
+
+  <main class="dashboard-page profile-page">
+    <a class="profile-back-link" href="dashboard.html">← กลับไป Dashboard</a>
+    <section class="profile-hero" aria-labelledby="profileTitle">
+      <div class="profile-avatar" aria-hidden="true" id="profileInitial">R</div>
+      <div>
+        <p class="eyebrow">Runner profile</p>
+        <h1 id="profileTitle">ข้อมูลโปรไฟล์</h1>
+        <p>ตั้งค่าข้อมูลพื้นฐานเพื่อให้ RunAI ปรับคำแนะนำให้เหมาะกับคุณ</p>
+      </div>
+    </section>
+    <p class="message hidden" id="profileMessage" role="status"></p>
+
+    <section class="profile-layout">
+      <aside class="profile-summary" aria-label="สรุปข้อมูลผู้ใช้">
+        <p class="eyebrow">Your overview</p>
+        <h2 id="summaryName">Runner</h2>
+        <p class="profile-email" id="summaryEmail">-</p>
+        <div class="profile-meta-list">
+          <div><span>ระดับ</span><strong id="summaryExperience">Beginner</strong></div>
+          <div><span>อายุ</span><strong id="summaryAge">-</strong></div>
+          <div><span>ส่วนสูง</span><strong id="summaryHeight">-</strong></div>
+          <div><span>น้ำหนัก</span><strong id="summaryWeight">-</strong></div>
+        </div>
+      </aside>
+
+      <section class="dashboard-panel profile-editor" aria-labelledby="profileFormTitle">
+        <div class="panel-heading"><p class="eyebrow">Edit profile</p><h2 id="profileFormTitle">ข้อมูลพื้นฐาน</h2></div>
+        <form class="dashboard-form" id="profileForm">
+          <label class="field"><span>ชื่อที่แสดง</span><input autocomplete="name" id="nameInput" required type="text" placeholder="ชื่อของคุณ"></label>
+          <div class="three-column dashboard-columns">
+            <label class="field"><span>อายุ</span><input id="ageInput" min="10" max="120" type="number" placeholder="ปี"></label>
+            <label class="field"><span>น้ำหนัก</span><input id="weightInput" min="20" max="400" step="0.1" type="number" placeholder="kg"></label>
+            <label class="field"><span>ส่วนสูง</span><input id="heightInput" min="80" max="260" step="0.1" type="number" placeholder="cm"></label>
+          </div>
+          <label class="field"><span>ประสบการณ์การวิ่ง</span>
+            <select id="experienceInput">
+              <option value="beginner">Beginner — เพิ่งเริ่มต้น</option>
+              <option value="intermediate">Intermediate — วิ่งเป็นประจำ</option>
+              <option value="advanced">Advanced — มีประสบการณ์</option>
+            </select>
+          </label>
+          <div class="profile-form-actions">
+            <a class="ghost-button profile-cancel" href="dashboard.html">ยกเลิก</a>
+            <button class="primary-button profile-save" id="saveButton" type="submit">บันทึกการเปลี่ยนแปลง</button>
+          </div>
+        </form>
+      </section>
+    </section>
+  </main>
+  <script src="profile.js"></script>
+</body>
+</html>
