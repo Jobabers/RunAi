@@ -233,6 +233,35 @@ router.post('/training-plans/adjustments/:adjustmentId/accept', async (req, res,
   }
 });
 
+router.post('/training-plans/adjustments/:adjustmentId/reject', async (req, res, next) => {
+  try {
+    const adjustment = await store.findAdjustmentById(req.params.adjustmentId);
+
+    if (!adjustment) {
+      throw new HttpError(404, 'ไม่พบแผนที่ AI ปรับให้');
+    }
+
+    const plan = await store.findPlanForUser(req.user.user_id, adjustment.training_plan_id);
+
+    if (!plan) {
+      throw new HttpError(404, 'ไม่พบตารางการฝึก');
+    }
+
+    assertCondition(adjustment.status === 'pending', 409, 'แผนนี้ถูกดำเนินการแล้ว');
+
+    const updatedAdjustment = await store.updateRecord('plan_adjustments', adjustment.plan_adjustment_id, {
+      status: 'rejected',
+    });
+
+    res.json({
+      plan: await store.serializePlan(plan),
+      adjustment: updatedAdjustment,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = {
   createPendingAdjustment,
   router,

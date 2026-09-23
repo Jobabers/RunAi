@@ -309,6 +309,103 @@ test('completes a daily quest once and rejects a forced fail after reaching targ
   assert.equal(duplicateComplete.response.status, 409);
 });
 
+test('rejects a pending AI plan adjustment without changing the active plan version', async (t) => {
+  store.resetForTests();
+  authProvider.resetForTests();
+  const server = await listen(app);
+  t.after(() => server.close());
+
+  const { port } = server.address();
+  const baseUrl = `http://127.0.0.1:${port}/api`;
+
+  await request(baseUrl, '/auth/register', {
+    method: 'POST',
+    body: {
+      email: 'adjustment-reject@example.com',
+      password: 'password123',
+    },
+  });
+
+  const login = await request(baseUrl, '/auth/login', {
+    method: 'POST',
+    body: {
+      email: 'adjustment-reject@example.com',
+      password: 'password123',
+    },
+  });
+  const { token } = login.data;
+
+  await request(baseUrl, '/me', {
+    method: 'PUT',
+    token,
+    body: {
+      name: 'Reject Runner',
+      age: 24,
+      weight: 68,
+      height: 176,
+      experience_level: 'beginner',
+    },
+  });
+
+  await request(baseUrl, '/runs', {
+    method: 'POST',
+    token,
+    body: {
+      run_date: toDateKey(),
+      distance: 3,
+      duration_minutes: 25,
+      run_type: 'Easy Run',
+    },
+  });
+
+  const goal = await request(baseUrl, '/goals', {
+    method: 'POST',
+    token,
+    body: {
+      goal_type: 'distance',
+      target_distance: 7,
+      target_duration_minutes: 50,
+      target_date: addDays(toDateKey(), 21),
+    },
+  });
+
+  const plan = await request(baseUrl, '/training-plans/generate', {
+    method: 'POST',
+    token,
+    body: { goal_id: goal.data.goal.goal_id },
+  });
+  const session = plan.data.plan.sessions[0];
+
+  const failed = await request(baseUrl, `/training-sessions/${session.training_session_id}/fail`, {
+    method: 'POST',
+    token,
+    body: {
+      actual_distance: Number(session.target_distance) - 0.5,
+      actual_duration_minutes: session.target_duration_minutes,
+      failure_reason: 'ตั้งใจทดสอบ reject flow',
+    },
+  });
+  assert.equal(failed.response.status, 201);
+  assert.equal(failed.data.pending_adjustment.status, 'pending');
+
+  const rejected = await request(
+    baseUrl,
+    `/training-plans/adjustments/${failed.data.pending_adjustment.plan_adjustment_id}/reject`,
+    { method: 'POST', token },
+  );
+  assert.equal(rejected.response.status, 200);
+  assert.equal(rejected.data.adjustment.status, 'rejected');
+  assert.equal(rejected.data.plan.version, 1);
+  assert.equal(rejected.data.plan.pending_adjustment, null);
+
+  const acceptRejected = await request(
+    baseUrl,
+    `/training-plans/adjustments/${failed.data.pending_adjustment.plan_adjustment_id}/accept`,
+    { method: 'POST', token },
+  );
+  assert.equal(acceptRejected.response.status, 409);
+});
+
 test('rejects invalid sprint 1 profile, run, and goal input', async (t) => {
   store.resetForTests();
   authProvider.resetForTests();

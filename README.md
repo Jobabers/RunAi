@@ -16,6 +16,8 @@ RunAI is a web application for improving running performance with AI-assisted tr
 - Quest submission with distance as the pass/fail criterion
 - Calendar connected to training sessions and quest status
 - Pending plan adjustment notice after a failed or expired quest
+- Plan adjustment review with current-vs-proposed quest preview
+- Accept or reject pending AI plan adjustments
 - Optional Gemini AI planner with rule-based fallback
 - Plain HTML/CSS/JavaScript frontend connected to the API
 - Current frontend screen set: login, register, profile, goal, run, history, and Sprint 2 dashboard
@@ -215,6 +217,7 @@ Use this checklist before opening a pull request for Sprint 2 work:
 - Submit today's quest as completed when actual distance reaches the target distance.
 - Test a second account or reset test data, then submit today's quest as failed with actual distance below target distance.
 - Confirm that one pending adjustment appears, the dashboard shows its preview, and `Accept Plan` updates the plan version.
+- Confirm that `Reject Plan` keeps the current plan and removes the pending adjustment from the dashboard.
 - In Supabase Table Editor, confirm rows exist in `profiles`, `runs`, `goals`, `training_plans`, `training_sessions`, `training_progress`, `ai_analysis`, and `plan_adjustments`.
 - Confirm there is only one pending adjustment per active training plan.
 
@@ -239,6 +242,7 @@ Use this checklist before opening a pull request for Sprint 2 work:
 - Completing a quest creates a quest-sourced Running Record and Training Progress.
 - Failed or expired quests can prepare a pending plan adjustment.
 - Pending adjustments are shown on the dashboard and require user acceptance before future sessions change.
+- Users can reject pending adjustments to keep the current plan.
 - The dashboard shows Daily Quest as an RPG-style quest board with rank, reward, timer, calendar detail, and plan adjustment preview.
 - Each active training plan can have only one pending adjustment at a time.
 

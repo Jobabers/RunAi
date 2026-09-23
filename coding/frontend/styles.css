@@ -981,6 +981,21 @@ textarea:focus {
   flex: 0 0 auto;
 }
 
+.quest-adjustment-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.reject-adjustment-button {
+  border-color: rgba(255, 84, 115, 0.32);
+  color: #ffb0bd;
+}
+
+.reject-adjustment-button:hover {
+  background: rgba(120, 13, 31, 0.34);
+}
+
 .quest-generate-button {
   justify-self: start;
   width: auto;
@@ -1114,11 +1129,11 @@ textarea:focus {
 
 .adjustment-preview-list {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
-.adjustment-preview-item {
+.adjustment-review-item {
   min-width: 0;
   border: 1px solid rgba(217, 179, 107, 0.22);
   border-radius: 8px;
@@ -1126,28 +1141,52 @@ textarea:focus {
   padding: 10px;
 }
 
-.adjustment-preview-item span,
-.adjustment-preview-item strong,
-.adjustment-preview-item small {
+.adjustment-review-item > span,
+.adjustment-review-item strong,
+.adjustment-review-item small,
+.adjustment-review-item em {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.adjustment-preview-item span {
+.adjustment-review-item > span {
   color: var(--muted);
   font-size: 0.68rem;
   font-weight: 900;
 }
 
-.adjustment-preview-item strong {
+.adjustment-review-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.adjustment-review-columns div {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+  background: rgba(10, 8, 9, 0.28);
+  padding: 8px;
+}
+
+.adjustment-review-item em {
+  color: var(--gold);
+  font-size: 0.62rem;
+  font-style: normal;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.adjustment-review-item strong {
   margin-top: 4px;
   color: #fff5d7;
   font-size: 0.84rem;
 }
 
-.adjustment-preview-item small {
+.adjustment-review-item small {
   margin-top: 2px;
   color: #f2d69d;
   font-size: 0.68rem;
@@ -1471,8 +1510,13 @@ a.panel-link:hover {
     flex-direction: column;
   }
 
+  .quest-adjustment-actions {
+    flex-direction: column;
+  }
+
   .quest-outcome-control,
   .adjustment-preview-list,
+  .adjustment-review-columns,
   .calendar-detail-runs,
   .timeline-item,
   .timeline-heading,

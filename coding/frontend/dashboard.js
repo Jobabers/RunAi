@@ -40,6 +40,7 @@ const elements = {
   questFailureReasonField: document.getElementById('questFailureReasonField'),
   generatePlanButton: document.getElementById('generatePlanButton'),
   acceptAdjustmentButton: document.getElementById('acceptAdjustmentButton'),
+  rejectAdjustmentButton: document.getElementById('rejectAdjustmentButton'),
   planTimelineSummary: document.getElementById('planTimelineSummary'),
   planSourcePill: document.getElementById('planSourcePill'),
   planTimelineList: document.getElementById('planTimelineList'),
@@ -427,6 +428,7 @@ function setQuestPanelState({
       ? `${proposedCount} เควสถัดไปจะถูกปรับหลังจากกดยอมรับ`
       : 'ไม่มีเควสอนาคตให้ปรับ แต่ระบบบันทึกผลวิเคราะห์ไว้แล้ว';
     elements.acceptAdjustmentButton.disabled = false;
+    elements.rejectAdjustmentButton.disabled = false;
   }
 
   elements.questMetrics.innerHTML = metrics.map((item) => `
@@ -550,21 +552,43 @@ function getTimelineSessions(plan) {
   return [...closed, ...futureOrToday].slice(0, 8);
 }
 
-function renderAdjustmentPreview(adjustment) {
+function renderAdjustmentSessionSummary(session) {
+  if (!session) {
+    return '<strong>-</strong><small>ไม่มีเควส</small>';
+  }
+
+  return `
+    <strong>${escapeHtml(session.training_type || 'Quest Run')}</strong>
+    <small>${escapeHtml(formatDistance(session.target_distance))}${session.target_duration_minutes ? ` · ${escapeHtml(session.target_duration_minutes)} min` : ''}</small>
+  `;
+}
+
+function renderAdjustmentPreview(adjustment, plan) {
   if (!adjustment) return '';
 
   const proposedSessions = Array.isArray(adjustment.proposed_sessions)
     ? adjustment.proposed_sessions.slice(0, 4)
     : [];
+  const currentFutureSessions = (plan?.sessions || [])
+    .filter((session) => session.session_date > getTodayKey())
+    .slice(0, 4);
   const proposedCount = Array.isArray(adjustment.proposed_sessions)
     ? adjustment.proposed_sessions.length
     : 0;
   const proposedList = proposedSessions.length
-    ? proposedSessions.map((session) => `
-      <div class="adjustment-preview-item">
+    ? proposedSessions.map((session, index) => `
+      <div class="adjustment-review-item">
         <span>${escapeHtml(formatDate(session.session_date))}</span>
-        <strong>${escapeHtml(session.training_type || 'Quest Run')}</strong>
-        <small>${escapeHtml(formatDistance(session.target_distance))}${session.target_duration_minutes ? ` · ${escapeHtml(session.target_duration_minutes)} min` : ''}</small>
+        <div class="adjustment-review-columns">
+          <div>
+            <em>Before</em>
+            ${renderAdjustmentSessionSummary(currentFutureSessions[index])}
+          </div>
+          <div>
+            <em>After</em>
+            ${renderAdjustmentSessionSummary(session)}
+          </div>
+        </div>
       </div>
     `).join('')
     : '<p class="empty-state compact-empty-state">ไม่มีเควสอนาคตให้ปรับ</p>';
@@ -577,7 +601,7 @@ function renderAdjustmentPreview(adjustment) {
       </div>
       <small>${proposedCount} future quests</small>
     </div>
-    <div class="adjustment-preview-list" aria-label="AI adjustment preview">
+    <div class="adjustment-preview-list" aria-label="AI adjustment before and after preview">
       ${proposedList}
     </div>
   `;
@@ -603,7 +627,7 @@ function renderPlanTimeline() {
   elements.planSourcePill.textContent = source === 'gemini' ? 'Gemini AI' : 'Rule Based';
   elements.planSourcePill.className = `plan-source-pill ${source === 'gemini' ? 'ai' : 'local'}`;
 
-  const adjustmentPreview = renderAdjustmentPreview(pendingAdjustment);
+  const adjustmentPreview = renderAdjustmentPreview(pendingAdjustment, plan);
 
   const sessionItems = sessions.map((session) => {
     const statusClass = getTimelineStatusClass(session.status);
@@ -1203,6 +1227,35 @@ async function handleAcceptAdjustmentClick() {
   }
 }
 
+async function handleRejectAdjustmentClick() {
+  const adjustment = dashboardState.activePlan?.pending_adjustment;
+  const adjustmentId = adjustment?.plan_adjustment_id;
+  if (!adjustmentId) {
+    showDashboardMessage('ยังไม่มีแผนปรับใหม่ให้ปฏิเสธ', 'error');
+    return;
+  }
+
+  const confirmed = window.confirm('ปฏิเสธแผนใหม่จาก AI ใช่ไหม? ระบบจะใช้แผนเดิมต่อไป');
+  if (!confirmed) return;
+
+  showDashboardMessage('');
+  elements.acceptAdjustmentButton.disabled = true;
+  elements.rejectAdjustmentButton.disabled = true;
+
+  try {
+    await apiFetch(`/training-plans/adjustments/${adjustmentId}/reject`, {
+      method: 'POST',
+    });
+    await loadDashboard();
+    showDashboardMessage('ปฏิเสธแผนที่ AI ปรับให้แล้ว ระบบจะใช้แผนเดิมต่อ');
+  } catch (error) {
+    showDashboardMessage(error.message, 'error');
+  } finally {
+    elements.acceptAdjustmentButton.disabled = false;
+    elements.rejectAdjustmentButton.disabled = false;
+  }
+}
+
 function bindEvents() {
   elements.logoutButton.addEventListener('click', redirectToLogin);
   elements.profileGateForm.addEventListener('submit', handleProfileGateSubmit);
@@ -1213,6 +1266,7 @@ function bindEvents() {
   elements.runForm.addEventListener('submit', handleRunSubmit);
   elements.generatePlanButton.addEventListener('click', handleGeneratePlanClick);
   elements.acceptAdjustmentButton.addEventListener('click', handleAcceptAdjustmentClick);
+  elements.rejectAdjustmentButton.addEventListener('click', handleRejectAdjustmentClick);
   elements.questSubmitForm.addEventListener('submit', handleQuestSubmit);
   elements.questSubmitForm.querySelectorAll('input[name="questOutcome"]').forEach((input) => {
     input.addEventListener('change', updateQuestOutcomeFields);

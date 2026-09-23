@@ -186,7 +186,10 @@
               <strong id="questAdjustmentTitle">มีแผนปรับใหม่รออยู่</strong>
               <p id="questAdjustmentText">ระบบจะไม่ใช้แผนใหม่จนกว่าคุณจะกดยอมรับ</p>
             </div>
-            <button class="ghost-button quest-adjustment-button" id="acceptAdjustmentButton" type="button">Accept Plan</button>
+            <div class="quest-adjustment-actions">
+              <button class="ghost-button quest-adjustment-button reject-adjustment-button" id="rejectAdjustmentButton" type="button">Reject Plan</button>
+              <button class="ghost-button quest-adjustment-button" id="acceptAdjustmentButton" type="button">Accept Plan</button>
+            </div>
           </div>
           <form class="quest-submit-form hidden" id="questSubmitForm">
             <div class="two-column dashboard-columns">
