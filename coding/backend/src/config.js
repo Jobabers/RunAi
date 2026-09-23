@@ -21,6 +21,11 @@ const config = {
     publishableKey: process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || '',
     serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
   },
+  ai: {
+    provider: String(process.env.AI_PROVIDER || 'rule-based').trim(),
+    geminiApiKey: String(process.env.GEMINI_API_KEY || '').trim(),
+    model: String(process.env.AI_MODEL || 'gemini-3.8-flash').trim(),
+  },
 };
 
 module.exports = config;

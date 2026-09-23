@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 process.env.STORAGE_DRIVER = 'memory';
+process.env.AI_PROVIDER = 'rule-based';
 
 const app = require('./app');
 const store = require('./storage');
@@ -166,6 +167,138 @@ test('supports the first RunAI quest workflow', async (t) => {
   assert.equal(failed.response.status, 201);
   assert.equal(failed.data.progress.status, 'failed');
   assert.equal(failed.data.pending_adjustment.status, 'pending');
+
+  const duplicateQuestSubmit = await request(baseUrl, `/training-sessions/${session.training_session_id}/submit`, {
+    method: 'POST',
+    token,
+    body: {
+      actual_distance: Number(session.target_distance),
+      actual_duration_minutes: session.target_duration_minutes,
+    },
+  });
+  assert.equal(duplicateQuestSubmit.response.status, 409);
+  assert.match(duplicateQuestSubmit.data.error.message, /ส่งผลแล้ว|ยังไม่เปิด/);
+
+  const activePlanWithAdjustment = await request(baseUrl, '/training-plans/active', {
+    token,
+  });
+  assert.equal(activePlanWithAdjustment.response.status, 200);
+  assert.equal(activePlanWithAdjustment.data.plan.pending_adjustment.status, 'pending');
+
+  const acceptedAdjustment = await request(
+    baseUrl,
+    `/training-plans/adjustments/${activePlanWithAdjustment.data.plan.pending_adjustment.plan_adjustment_id}/accept`,
+    {
+      method: 'POST',
+      token,
+    },
+  );
+  assert.equal(acceptedAdjustment.response.status, 200);
+  assert.equal(acceptedAdjustment.data.adjustment.status, 'accepted');
+  assert.equal(acceptedAdjustment.data.plan.version, 2);
+});
+
+test('completes a daily quest once and rejects a forced fail after reaching target distance', async (t) => {
+  store.resetForTests();
+  authProvider.resetForTests();
+  const server = await listen(app);
+  t.after(() => server.close());
+
+  const { port } = server.address();
+  const baseUrl = `http://127.0.0.1:${port}/api`;
+
+  await request(baseUrl, '/auth/register', {
+    method: 'POST',
+    body: {
+      name: 'Quest Finisher',
+      email: 'quest-finisher@example.com',
+      password: 'password123',
+    },
+  });
+
+  const login = await request(baseUrl, '/auth/login', {
+    method: 'POST',
+    body: {
+      email: 'quest-finisher@example.com',
+      password: 'password123',
+    },
+  });
+  const { token } = login.data;
+
+  await request(baseUrl, '/me', {
+    method: 'PUT',
+    token,
+    body: {
+      name: 'Quest Finisher',
+      age: 22,
+      weight: 62,
+      height: 170,
+      experience_level: 'beginner',
+    },
+  });
+
+  await request(baseUrl, '/runs', {
+    method: 'POST',
+    token,
+    body: {
+      run_date: toDateKey(),
+      distance: 4,
+      duration_minutes: 30,
+      run_type: 'Easy Run',
+    },
+  });
+
+  const goal = await request(baseUrl, '/goals', {
+    method: 'POST',
+    token,
+    body: {
+      goal_type: 'distance',
+      target_distance: 8,
+      target_duration_minutes: 55,
+      target_date: addDays(toDateKey(), 21),
+    },
+  });
+
+  const plan = await request(baseUrl, '/training-plans/generate', {
+    method: 'POST',
+    token,
+    body: { goal_id: goal.data.goal.goal_id },
+  });
+  const session = plan.data.plan.sessions[0];
+
+  const impossibleFail = await request(baseUrl, `/training-sessions/${session.training_session_id}/fail`, {
+    method: 'POST',
+    token,
+    body: {
+      actual_distance: Number(session.target_distance),
+      actual_duration_minutes: session.target_duration_minutes,
+      failure_reason: 'ลองส่งผิด',
+    },
+  });
+  assert.equal(impossibleFail.response.status, 422);
+  assert.match(impossibleFail.data.error.message, /ถึงเป้า/);
+
+  const completed = await request(baseUrl, `/training-sessions/${session.training_session_id}/submit`, {
+    method: 'POST',
+    token,
+    body: {
+      actual_distance: Number(session.target_distance),
+      actual_duration_minutes: session.target_duration_minutes,
+    },
+  });
+  assert.equal(completed.response.status, 201);
+  assert.equal(completed.data.progress.status, 'completed');
+  assert.equal(completed.data.run.source, 'quest');
+
+  const duplicateComplete = await request(baseUrl, `/training-sessions/${session.training_session_id}/submit`, {
+    method: 'POST',
+    token,
+    body: {
+      actual_distance: Number(session.target_distance),
+      actual_duration_minutes: session.target_duration_minutes,
+    },
+  });
+  assert.equal(duplicateComplete.response.status, 409);
 });
 
 test('rejects invalid sprint 1 profile, run, and goal input', async (t) => {

@@ -3,8 +3,8 @@ const store = require('../storage');
 const {
   adjustFutureSessions,
   createTrainingSessions,
-  summarizeAnalysis,
 } = require('../services/trainingPlanner');
+const { adjustPlan, createInitialPlan } = require('../services/aiCoach');
 const { compareDateKey, toDateKey } = require('../utils/dates');
 const { assertCondition, HttpError } = require('../utils/httpError');
 
@@ -24,15 +24,35 @@ async function createPendingAdjustment({ user, plan, failedSession, reason, trig
   const today = toDateKey();
   const futureSessions = (await store.getPlanSessions(plan.training_plan_id))
     .filter((session) => compareDateKey(session.session_date, today) > 0);
+  const fallbackSessions = adjustFutureSessions({
+    failedSession,
+    futureSessions,
+    goal,
+    runs,
+  });
+  const aiAdjustment = await adjustPlan({
+    user,
+    goal,
+    runs,
+    failedSession,
+    futureSessions,
+    reason,
+    fallbackSessions,
+    triggerType,
+  });
 
   const analysis = await store.createRecord('ai_analysis', {
     user_id: user.user_id,
     training_plan_id: plan.training_plan_id,
     trigger_type: triggerType,
     result_json: {
-      ...summarizeAnalysis({ goal, runs, trigger: triggerType }),
+      summary: aiAdjustment.summary,
+      recommendation: aiAdjustment.recommendation,
+      source: aiAdjustment.source,
+      enabled: aiAdjustment.enabled,
       failed_session_id: failedSession.training_session_id,
       reason,
+      fallback_reason: aiAdjustment.reason || null,
     },
   });
 
@@ -41,12 +61,7 @@ async function createPendingAdjustment({ user, plan, failedSession, reason, trig
     ai_analysis_id: analysis.ai_analysis_id,
     reason,
     status: 'pending',
-    proposed_sessions: adjustFutureSessions({
-      failedSession,
-      futureSessions,
-      goal,
-      runs,
-    }),
+    proposed_sessions: aiAdjustment.sessions,
   });
 }
 
@@ -97,9 +112,27 @@ router.post('/training-plans/generate', async (req, res, next) => {
     assertCondition(goal, 400, 'กรุณาสร้างหรือเลือกเป้าหมายที่กำลังใช้งานก่อน');
 
     const startDate = req.body.start_date || toDateKey();
-    const weeks = Number(req.body.weeks || 2);
-    const generatedSessions = createTrainingSessions({ startDate, weeks, goal, runs });
-    const endDate = generatedSessions[generatedSessions.length - 1].session_date;
+    const requestedEndDate = req.body.end_date || goal.target_date;
+    const weeks = req.body.weeks ? Number(req.body.weeks) : undefined;
+    const fallbackSessions = createTrainingSessions({
+      startDate,
+      endDate: weeks ? null : requestedEndDate,
+      weeks: weeks || 2,
+      goal,
+      runs,
+    });
+    const aiPlan = await createInitialPlan({
+      user: req.user,
+      goal,
+      runs,
+      startDate,
+      endDate: weeks ? fallbackSessions[fallbackSessions.length - 1].session_date : requestedEndDate,
+      fallbackSessions,
+    });
+    const generatedSessions = aiPlan.sessions;
+    const endDate = weeks
+      ? generatedSessions[generatedSessions.length - 1].session_date
+      : requestedEndDate;
 
     const plan = await store.createRecord('training_plans', {
       user_id: req.user.user_id,
@@ -108,7 +141,7 @@ router.post('/training-plans/generate', async (req, res, next) => {
       end_date: endDate,
       status: 'active',
       version: 1,
-      source: 'ai_placeholder',
+      source: aiPlan.source,
     });
 
     await store.createRecords(
@@ -123,7 +156,13 @@ router.post('/training-plans/generate', async (req, res, next) => {
       user_id: req.user.user_id,
       training_plan_id: plan.training_plan_id,
       trigger_type: 'initial_plan',
-      result_json: summarizeAnalysis({ goal, runs, trigger: 'initial_plan' }),
+      result_json: {
+        summary: aiPlan.summary,
+        recommendation: aiPlan.recommendation,
+        source: aiPlan.source,
+        enabled: aiPlan.enabled,
+        fallback_reason: aiPlan.reason || null,
+      },
     });
 
     res.status(201).json({

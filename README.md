@@ -2,19 +2,24 @@
 
 RunAI is a web application for improving running performance with AI-assisted training plans, daily quests, and a feedback loop after each quest result.
 
-## Current Sprint 1 MVP
+## Current Sprint 2 MVP
 
 - Backend API with Express
 - In-memory development storage for tests
 - Supabase PostgreSQL schema in `coding/backend/database/schema.sql`
 - Authentication through Supabase Auth
 - Profile, active goal, and running record APIs
-- History and progress summaries for Sprint 1
+- History and progress summaries
 - Active goal rule: one user can have only one active goal
-- Rule-based planner and daily quest APIs are present for later sprints, but the Sprint 1 UI stays focused on foundation data
+- Rule-based training plan generation from the active goal
+- Daily Quest panel on the dashboard
+- Quest submission with distance as the pass/fail criterion
+- Calendar connected to training sessions and quest status
+- Pending plan adjustment notice after a failed or expired quest
+- Optional Gemini AI planner with rule-based fallback
 - Plain HTML/CSS/JavaScript frontend connected to the API
-- Current frontend screen set: login, register, profile, goal, run, history, and Sprint 1 dashboard
-- First dashboard flow: Profile -> First Run -> Goal -> full Sprint 1 dashboard
+- Current frontend screen set: login, register, profile, goal, run, history, and Sprint 2 dashboard
+- First dashboard flow: Profile -> First Run -> Goal -> auto-generated Training Plan -> Daily Quest dashboard
 
 Note: the backend runs with in-memory storage by default for local development. Set `STORAGE_DRIVER=supabase` and provide Supabase credentials to use persistent storage.
 
@@ -73,9 +78,16 @@ STORAGE_DRIVER=supabase
 SUPABASE_URL=https://your-project-ref.supabase.co
 SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# Optional AI planner.
+# Leave as rule-based if you do not have a Gemini key yet.
+AI_PROVIDER=rule-based
+AI_MODEL=gemini-3.8-flash
+GEMINI_API_KEY=your-gemini-api-key
 ```
 
 Use `SUPABASE_SERVICE_ROLE_KEY` only in the backend. Do not put Supabase secret keys in frontend HTML, CSS, or browser JavaScript.
+Use `GEMINI_API_KEY` only in the backend as well. Do not put AI keys in frontend HTML, CSS, or browser JavaScript.
 
 ### 4. Setup Supabase Database
 
@@ -91,11 +103,15 @@ If this Supabase project already has the old RunAI tables with `public.users` an
 
 Use `coding/backend/database/reset_for_supabase_auth.sql` only for dev/test data because it drops existing RunAI tables without keeping backups.
 
-For the current Sprint 1 schema, make sure this index exists in Supabase so the database also enforces one active goal per user:
+For the current schema, make sure these indexes exist in Supabase so the database also enforces one active goal and one active training plan per user:
 
 ```sql
 create unique index if not exists uq_goals_one_active_per_user
   on goals (user_id)
+  where status = 'active';
+
+create unique index if not exists uq_training_plans_one_active_per_user
+  on training_plans (user_id)
   where status = 'active';
 ```
 
@@ -134,6 +150,27 @@ Supabase Auth owns accounts in `auth.users`. RunAI profile data is stored in `pu
 
 Keep `SUPABASE_SERVICE_ROLE_KEY` in `coding/backend/.env` only. Never put secret keys in frontend HTML, CSS, or browser JavaScript.
 
+## Gemini AI Setup
+
+RunAI can use Gemini for Training Plan generation and future Quest adjustment.
+
+For local development, the app still works without Gemini because the backend falls back to the rule-based planner.
+
+To enable Gemini:
+
+```env
+AI_PROVIDER=gemini
+AI_MODEL=gemini-3.8-flash
+GEMINI_API_KEY=your-gemini-api-key
+```
+
+Gemini is called from the backend only:
+
+- Initial plan: `POST /api/training-plans/generate`
+- Failed or expired quest adjustment: pending `plan_adjustments`
+
+The backend validates AI output before saving it, and the user still has to accept adjusted plans before future sessions change.
+
 ## Team Git Workflow
 
 - `main` is the main shared branch.
@@ -160,7 +197,7 @@ node --check dashboard.js
 node --check server.js
 ```
 
-The frontend starts from authentication, then redirects logged-in users to `dashboard.html`. New users must complete Profile, enter their first run distance and duration, then create a Goal before the full Sprint 1 dashboard is unlocked.
+The frontend starts from authentication, then redirects logged-in users to `dashboard.html`. New users must complete Profile, enter their first run distance and duration, then create a Goal. Sprint 2 automatically generates a Training Plan from that Goal and unlocks the Daily Quest dashboard.
 
 ## Sprint 1 Scope
 
@@ -171,12 +208,19 @@ The frontend starts from authentication, then redirects logged-in users to `dash
 - One user can have only one active goal.
 - Sprint 1 covers Auth/Profile, Goal, Running Record, History, and Progress.
 
-## Later Sprint Rules Preserved
+## Sprint 2 Scope
 
 - Users need at least one run before generating the first training plan.
 - One user can have only one active training plan.
+- Training plans are generated from today through the active goal target date.
 - `training_sessions` are daily quests; there is no separate `quests` table.
+- If a plan date has no training session, the dashboard shows it as a Rest Day.
 - Quest success is based on actual distance.
-- Submitted quest results cannot be edited.
-- Failed or expired quests trigger AI analysis and adjustment of future sessions only.
-- A user must accept an adjusted plan before it becomes active.
+- Submitted quest results cannot be edited or submitted again.
+- Completing a quest creates a quest-sourced Running Record and Training Progress.
+- Failed or expired quests can prepare a pending plan adjustment.
+- Pending adjustments are shown on the dashboard and require user acceptance before future sessions change.
+
+## Later Sprint Rules Preserved
+
+- Full AI analysis quality and detailed adjusted-plan review/reject UI are planned for later sprints.

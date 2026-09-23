@@ -6,12 +6,13 @@ Current scope:
 
 - `index.html` is the login screen.
 - `register.html` is the register screen.
-- `dashboard.html` is the Sprint 1 workspace for profile, active goal, running records, history, and progress.
-- `run.html` stores Running Records. These are Sprint 1 history data, not Daily Quest submissions.
+- `dashboard.html` is the Sprint 2 workspace for profile, active goal, training plan, daily quest, running records, history, and progress.
+- `run.html` stores manual Running Records. Daily Quest submissions are sent from the dashboard quest panel.
 - `goal.html` allows one active goal at a time.
 - These screens call the backend API at `http://localhost:4000/api`.
-- Dashboard unlock order is Profile -> First Run -> Goal -> full dashboard.
-- Daily Quest submission starts in Sprint 2.
+- Dashboard unlock order is Profile -> First Run -> Goal -> auto-generated Training Plan -> Daily Quest dashboard.
+- Daily Quest success is decided by actual distance and can be submitted only once.
+- Failed or expired quests can show a pending AI plan adjustment that must be accepted before the future plan changes.
 
 Run it with:
 
