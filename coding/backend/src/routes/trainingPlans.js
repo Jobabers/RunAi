@@ -19,6 +19,11 @@ function hasAdjustmentForSession(plan, session) {
 }
 
 async function createPendingAdjustment({ user, plan, failedSession, reason, triggerType = 'failed_quest' }) {
+  const existingPendingAdjustment = await store.findPendingAdjustmentForPlan(plan.training_plan_id);
+  if (existingPendingAdjustment) {
+    return existingPendingAdjustment;
+  }
+
   const goal = await store.findGoalById(plan.goal_id);
   const runs = await store.listRunsForUser(user.user_id);
   const today = toDateKey();

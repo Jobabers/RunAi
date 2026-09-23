@@ -29,13 +29,20 @@ const elements = {
   questPanelText: document.getElementById('questPanelText'),
   questStatusPill: document.getElementById('questStatusPill'),
   questMeta: document.getElementById('questMeta'),
+  questRankLabel: document.getElementById('questRankLabel'),
+  questRewardLabel: document.getElementById('questRewardLabel'),
+  questTimerLabel: document.getElementById('questTimerLabel'),
   questMetrics: document.getElementById('questMetrics'),
   questAdjustment: document.getElementById('questAdjustment'),
   questAdjustmentTitle: document.getElementById('questAdjustmentTitle'),
   questAdjustmentText: document.getElementById('questAdjustmentText'),
   questSubmitForm: document.getElementById('questSubmitForm'),
+  questFailureReasonField: document.getElementById('questFailureReasonField'),
   generatePlanButton: document.getElementById('generatePlanButton'),
   acceptAdjustmentButton: document.getElementById('acceptAdjustmentButton'),
+  planTimelineSummary: document.getElementById('planTimelineSummary'),
+  planSourcePill: document.getElementById('planSourcePill'),
+  planTimelineList: document.getElementById('planTimelineList'),
   recentRunsList: document.getElementById('recentRunsList'),
   progressChartBars: document.getElementById('progressChartBars'),
   progressChartMeta: document.getElementById('progressChartMeta'),
@@ -44,6 +51,7 @@ const elements = {
   calendarTitle: document.getElementById('calendarTitle'),
   calendarSummary: document.getElementById('calendarSummary'),
   trainingCalendar: document.getElementById('trainingCalendar'),
+  calendarDayDetail: document.getElementById('calendarDayDetail'),
   calendarPrevButton: document.getElementById('calendarPrevButton'),
   calendarTodayButton: document.getElementById('calendarTodayButton'),
   calendarNextButton: document.getElementById('calendarNextButton'),
@@ -79,6 +87,7 @@ const inputs = {
   runType: document.getElementById('runTypeInput'),
   questDistance: document.getElementById('questDistanceInput'),
   questDuration: document.getElementById('questDurationInput'),
+  questFailureReason: document.getElementById('questFailureReasonInput'),
 };
 
 let dashboardState = {
@@ -89,6 +98,7 @@ let dashboardState = {
 };
 
 let calendarCursor = new Date();
+let selectedCalendarDate = null;
 
 function redirectToLogin() {
   localStorage.removeItem('runai_token');
@@ -209,6 +219,55 @@ function getQuestStatusText(status) {
 function getQuestTypeLabel(session) {
   if (!session) return 'Rest Day';
   return session.training_type || 'Quest Run';
+}
+
+function getQuestRankLabel(session) {
+  if (!session || session.status === 'rest') return 'Rest';
+  const distance = Number(session.target_distance || 0);
+  if (distance >= 15) return 'Epic';
+  if (distance >= 10) return 'A-Rank';
+  if (distance >= 5) return 'B-Rank';
+  return 'C-Rank';
+}
+
+function getQuestRewardLabel(session) {
+  if (!session) return 'Recovery';
+  if (session.status === 'completed') return 'Claimed';
+  if (session.status === 'failed') return 'Retry Wisdom';
+  if (session.status === 'expired') return 'Plan Review';
+  if (session.status === 'available') return '+1 Plan EXP';
+  return 'Locked EXP';
+}
+
+function getTimeUntilMidnightText() {
+  const now = new Date();
+  const midnight = new Date(now);
+  midnight.setDate(now.getDate() + 1);
+  midnight.setHours(0, 0, 0, 0);
+  const diffMs = Math.max(0, midnight - now);
+  const hours = Math.floor(diffMs / 3600000);
+  const minutes = Math.floor((diffMs % 3600000) / 60000);
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+function setQuestRpgSummary(session, timerText = '-') {
+  elements.questRankLabel.textContent = getQuestRankLabel(session);
+  elements.questRewardLabel.textContent = getQuestRewardLabel(session);
+  elements.questTimerLabel.textContent = timerText;
+}
+
+function getQuestOutcome() {
+  return elements.questSubmitForm
+    .querySelector('input[name="questOutcome"]:checked')?.value || 'completed';
+}
+
+function updateQuestOutcomeFields() {
+  const isFailed = getQuestOutcome() === 'failed';
+  elements.questFailureReasonField.classList.toggle('hidden', !isFailed);
+  inputs.questFailureReason.required = isFailed;
+  if (!isFailed) {
+    inputs.questFailureReason.value = '';
+  }
 }
 
 function getPlanProgress(plan) {
@@ -344,6 +403,8 @@ function setQuestPanelState({
   meta,
   metrics = [],
   adjustment = null,
+  rpgSession = null,
+  timerText = '-',
   showForm = false,
   showGenerate = false,
 }) {
@@ -355,6 +416,7 @@ function setQuestPanelState({
   elements.questSubmitForm.classList.toggle('hidden', !showForm);
   elements.generatePlanButton.classList.toggle('hidden', !showGenerate);
   elements.questAdjustment.classList.toggle('hidden', !adjustment);
+  setQuestRpgSummary(rpgSession, timerText);
 
   if (adjustment) {
     const proposedCount = Array.isArray(adjustment.proposed_sessions)
@@ -419,6 +481,8 @@ function renderQuestPanel() {
         { label: 'Action', value: 'ไม่ต้องส่งผล' },
       ],
       adjustment: pendingAdjustment,
+      rpgSession: { status: 'rest' },
+      timerText: 'Rest',
     });
     return;
   }
@@ -441,6 +505,8 @@ function renderQuestPanel() {
       meta: `หมดเวลาเมื่อขึ้นวันใหม่ · ${formatDate(todayQuest.session_date)}`,
       metrics: baseMetrics,
       adjustment: pendingAdjustment,
+      rpgSession: todayQuest,
+      timerText: getTimeUntilMidnightText(),
       showForm: true,
     });
     return;
@@ -461,7 +527,106 @@ function renderQuestPanel() {
     meta: `Quest date · ${formatDate(todayQuest.session_date)}`,
     metrics: baseMetrics,
     adjustment: pendingAdjustment,
+    rpgSession: todayQuest,
+    timerText: todayQuest.status === 'locked' ? 'Locked' : 'Closed',
   });
+}
+
+function getTimelineStatusClass(status) {
+  if (['completed', 'failed', 'expired', 'available', 'rest'].includes(status)) {
+    return status;
+  }
+  return 'locked';
+}
+
+function getTimelineSessions(plan) {
+  const today = getTodayKey();
+  const sessions = plan?.sessions || [];
+  const futureOrToday = sessions.filter((session) => session.session_date >= today);
+  const closed = sessions
+    .filter((session) => session.session_date < today)
+    .slice(-2);
+
+  return [...closed, ...futureOrToday].slice(0, 8);
+}
+
+function renderAdjustmentPreview(adjustment) {
+  if (!adjustment) return '';
+
+  const proposedSessions = Array.isArray(adjustment.proposed_sessions)
+    ? adjustment.proposed_sessions.slice(0, 4)
+    : [];
+  const proposedCount = Array.isArray(adjustment.proposed_sessions)
+    ? adjustment.proposed_sessions.length
+    : 0;
+  const proposedList = proposedSessions.length
+    ? proposedSessions.map((session) => `
+      <div class="adjustment-preview-item">
+        <span>${escapeHtml(formatDate(session.session_date))}</span>
+        <strong>${escapeHtml(session.training_type || 'Quest Run')}</strong>
+        <small>${escapeHtml(formatDistance(session.target_distance))}${session.target_duration_minutes ? ` · ${escapeHtml(session.target_duration_minutes)} min` : ''}</small>
+      </div>
+    `).join('')
+    : '<p class="empty-state compact-empty-state">ไม่มีเควสอนาคตให้ปรับ</p>';
+
+  return `
+    <div class="timeline-adjustment-card">
+      <div>
+        <span>Pending Adjustment</span>
+        <strong>AI มีแผนปรับใหม่รอการยอมรับ</strong>
+      </div>
+      <small>${proposedCount} future quests</small>
+    </div>
+    <div class="adjustment-preview-list" aria-label="AI adjustment preview">
+      ${proposedList}
+    </div>
+  `;
+}
+
+function renderPlanTimeline() {
+  const plan = dashboardState.activePlan;
+  const pendingAdjustment = plan?.pending_adjustment || null;
+
+  if (!plan) {
+    elements.planTimelineSummary.textContent = 'สร้าง Goal แล้ว Generate Training Plan เพื่อเปิด Quest Timeline';
+    elements.planSourcePill.textContent = 'No Plan';
+    elements.planSourcePill.className = 'plan-source-pill';
+    elements.planTimelineList.innerHTML = '<p class="empty-state compact-empty-state">ยังไม่มีแผนเควส</p>';
+    return;
+  }
+
+  const progress = getPlanProgress(plan);
+  const source = plan.source || 'rule-based';
+  const sessions = getTimelineSessions(plan);
+
+  elements.planTimelineSummary.textContent = `Plan v${plan.version || 1} · ${progress.completed}/${progress.total} quests completed · ${formatDate(plan.start_date)} - ${formatDate(plan.end_date)}`;
+  elements.planSourcePill.textContent = source === 'gemini' ? 'Gemini AI' : 'Rule Based';
+  elements.planSourcePill.className = `plan-source-pill ${source === 'gemini' ? 'ai' : 'local'}`;
+
+  const adjustmentPreview = renderAdjustmentPreview(pendingAdjustment);
+
+  const sessionItems = sessions.map((session) => {
+    const statusClass = getTimelineStatusClass(session.status);
+    const target = Number(session.target_distance || 0);
+    return `
+      <div class="timeline-item ${statusClass}">
+        <div class="timeline-date">
+          <strong>${escapeHtml(formatDate(session.session_date))}</strong>
+          <small>${escapeHtml(getQuestStatusText(session.status))}</small>
+        </div>
+        <div class="timeline-main">
+          <strong>${escapeHtml(getQuestTypeLabel(session))}</strong>
+          <span>${escapeHtml(session.note || 'ฝึกตามแผนที่กำหนด')}</span>
+        </div>
+        <div class="timeline-target">
+          <strong>${escapeHtml(formatDistance(target))}</strong>
+          <small>${session.target_duration_minutes ? `${escapeHtml(session.target_duration_minutes)} min` : '-'}</small>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  elements.planTimelineList.innerHTML = `${adjustmentPreview}${sessionItems || '<p class="empty-state compact-empty-state">ไม่มีเควสในช่วงนี้</p>'}`;
 }
 
 function renderHistory() {
@@ -557,8 +722,9 @@ function getPlanCalendarByDate(plan) {
   }, new Map());
 }
 
-function getCalendarCell({ key, day, outsideMonth, run, session, planDay, today }) {
+function getCalendarCell({ key, day, outsideMonth, run, session, planDay, today, selectedDate }) {
   const isToday = key === today;
+  const isSelected = key === selectedDate;
   let state = '';
   let label = '';
   let detail = '';
@@ -592,12 +758,68 @@ function getCalendarCell({ key, day, outsideMonth, run, session, planDay, today 
     detail = dashboardState.activePlan ? 'Rest Day' : 'No plan';
   }
 
+  const ariaLabel = `${formatDate(key)} ${label || detail || 'No plan'}`;
+
   return `
-    <div class="calendar-day ${state} ${outsideMonth ? 'outside-month' : ''}">
+    <button class="calendar-day ${state} ${outsideMonth ? 'outside-month' : ''} ${isSelected ? 'selected' : ''}" type="button" data-date="${escapeHtml(key)}" aria-label="${escapeHtml(ariaLabel)}">
       <strong>${day}</strong>
       <span>${escapeHtml(label)}</span>
       <small>${escapeHtml(detail)}</small>
+    </button>
+  `;
+}
+
+function getRunsForDate(dateKey) {
+  return dashboardState.runs.filter((run) => run.run_date === dateKey);
+}
+
+function renderCalendarDayDetail() {
+  if (!selectedCalendarDate) {
+    selectedCalendarDate = getTodayKey();
+  }
+
+  const sessionsByDate = getPlanSessionsByDate(dashboardState.activePlan);
+  const planDaysByDate = getPlanCalendarByDate(dashboardState.activePlan);
+  const session = sessionsByDate.get(selectedCalendarDate);
+  const planDay = planDaysByDate.get(selectedCalendarDate);
+  const runs = getRunsForDate(selectedCalendarDate);
+  const status = session ? getQuestStatusText(session.status) : planDay ? 'Rest Day' : 'No Plan';
+  const questMarkup = session ? `
+    <div class="calendar-detail-card">
+      <span>Quest</span>
+      <strong>${escapeHtml(getQuestTypeLabel(session))}</strong>
+      <small>${escapeHtml(formatDistance(session.target_distance))}${session.target_duration_minutes ? ` · ${escapeHtml(session.target_duration_minutes)} min` : ''} · ${escapeHtml(status)}</small>
+      <p>${escapeHtml(session.note || 'ฝึกตามแผนที่กำหนด')}</p>
     </div>
+  ` : `
+    <div class="calendar-detail-card">
+      <span>${planDay ? 'Rest Day' : 'No Plan'}</span>
+      <strong>${planDay ? 'วันนี้ไม่มีเควส' : 'ยังไม่มีเควสในวันนี้'}</strong>
+      <small>${planDay ? 'ไม่ต้อง Submit และไม่สร้าง Training Progress' : 'สร้าง Training Plan เพื่อให้ปฏิทินมีเควส'}</small>
+    </div>
+  `;
+  const runMarkup = runs.length ? `
+    <div class="calendar-detail-runs">
+      ${runs.map((run) => `
+        <div>
+          <span>${escapeHtml(run.run_type || 'Easy Run')}</span>
+          <strong>${escapeHtml(formatDistance(run.distance))}</strong>
+          <small>${escapeHtml(run.duration_minutes)} min · ${escapeHtml(formatPace(run.distance, run.duration_minutes))}</small>
+        </div>
+      `).join('')}
+    </div>
+  ` : '<p class="calendar-detail-empty">ยังไม่มี Running Record ในวันนี้</p>';
+
+  elements.calendarDayDetail.innerHTML = `
+    <div class="calendar-detail-heading">
+      <div>
+        <span>Selected Day</span>
+        <strong>${escapeHtml(formatDate(selectedCalendarDate))}</strong>
+      </div>
+      <small>${escapeHtml(status)}</small>
+    </div>
+    ${questMarkup}
+    ${runMarkup}
   `;
 }
 
@@ -638,10 +860,12 @@ function renderCalendar() {
       session: sessionsByDate.get(key),
       planDay: planDaysByDate.get(key),
       today,
+      selectedDate: selectedCalendarDate,
     }));
   }
 
   elements.trainingCalendar.innerHTML = cells.join('');
+  renderCalendarDayDetail();
 }
 
 function renderGateFlow() {
@@ -666,6 +890,7 @@ function renderDashboard() {
   renderStats();
   renderGoalFormState();
   renderQuestPanel();
+  renderPlanTimeline();
   renderHistory();
   renderRecentRuns();
   renderProgressChart();
@@ -899,18 +1124,35 @@ async function handleQuestSubmit(event) {
   const actualDistance = Number(inputs.questDistance.value);
   const actualDuration = Number(inputs.questDuration.value);
   const targetDistance = Number(todayQuest.target_distance || 0);
+  const outcome = getQuestOutcome();
+  const isCompleted = outcome === 'completed';
+  const failureReason = inputs.questFailureReason.value.trim();
   const payload = {
     actual_distance: actualDistance,
     actual_duration_minutes: actualDuration,
   };
 
-  const isCompleted = actualDistance >= targetDistance;
+  if (isCompleted && actualDistance < targetDistance) {
+    showDashboardMessage(`ระยะทางยังไม่ถึงเป้า ${formatDistance(targetDistance)} กรุณาเลือกทำเควสไม่สำเร็จ`, 'error');
+    return;
+  }
+
+  if (!isCompleted && actualDistance >= targetDistance) {
+    showDashboardMessage('ระยะทางถึงเป้าแล้ว กรุณาส่งเป็นเควสสำเร็จ', 'error');
+    return;
+  }
+
+  if (!isCompleted && !failureReason) {
+    showDashboardMessage('กรุณาระบุเหตุผลที่ทำเควสไม่สำเร็จ', 'error');
+    return;
+  }
+
   const endpoint = isCompleted
     ? `/training-sessions/${todayQuest.training_session_id}/submit`
     : `/training-sessions/${todayQuest.training_session_id}/fail`;
 
   if (!isCompleted) {
-    payload.failure_reason = `วิ่งได้ ${formatDistance(actualDistance)} จากเป้าหมาย ${formatDistance(targetDistance)}`;
+    payload.failure_reason = failureReason;
   }
 
   elements.questSubmitForm.querySelector('button[type="submit"]').disabled = true;
@@ -921,6 +1163,7 @@ async function handleQuestSubmit(event) {
       body: JSON.stringify(payload),
     });
     elements.questSubmitForm.reset();
+    updateQuestOutcomeFields();
     await loadDashboard();
     showDashboardMessage(isCompleted ? 'ส่งเควสสำเร็จแล้ว' : 'บันทึกเควสไม่สำเร็จแล้ว', isCompleted ? 'success' : 'error');
   } catch (error) {
@@ -931,11 +1174,18 @@ async function handleQuestSubmit(event) {
 }
 
 async function handleAcceptAdjustmentClick() {
-  const adjustmentId = dashboardState.activePlan?.pending_adjustment?.plan_adjustment_id;
+  const adjustment = dashboardState.activePlan?.pending_adjustment;
+  const adjustmentId = adjustment?.plan_adjustment_id;
   if (!adjustmentId) {
     showDashboardMessage('ยังไม่มีแผนปรับใหม่ให้ยอมรับ', 'error');
     return;
   }
+
+  const proposedCount = Array.isArray(adjustment.proposed_sessions)
+    ? adjustment.proposed_sessions.length
+    : 0;
+  const confirmed = window.confirm(`ยอมรับแผนใหม่จาก AI ใช่ไหม? ระบบจะแทนที่ ${proposedCount} เควสอนาคต และย้อนกลับไม่ได้`);
+  if (!confirmed) return;
 
   showDashboardMessage('');
   elements.acceptAdjustmentButton.disabled = true;
@@ -964,12 +1214,23 @@ function bindEvents() {
   elements.generatePlanButton.addEventListener('click', handleGeneratePlanClick);
   elements.acceptAdjustmentButton.addEventListener('click', handleAcceptAdjustmentClick);
   elements.questSubmitForm.addEventListener('submit', handleQuestSubmit);
+  elements.questSubmitForm.querySelectorAll('input[name="questOutcome"]').forEach((input) => {
+    input.addEventListener('change', updateQuestOutcomeFields);
+  });
+  elements.trainingCalendar.addEventListener('click', (event) => {
+    const dayButton = event.target.closest('.calendar-day');
+    if (!dayButton) return;
+
+    selectedCalendarDate = dayButton.dataset.date;
+    renderCalendar();
+  });
   elements.calendarPrevButton.addEventListener('click', () => {
     calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() - 1, 1);
     renderCalendar();
   });
   elements.calendarTodayButton.addEventListener('click', () => {
     calendarCursor = new Date();
+    selectedCalendarDate = getTodayKey();
     renderCalendar();
   });
   elements.calendarNextButton.addEventListener('click', () => {
@@ -982,6 +1243,15 @@ function bindEvents() {
   });
 }
 
+function startQuestTimer() {
+  window.setInterval(() => {
+    const todayQuest = getTodayQuest();
+    if (todayQuest?.status === 'available') {
+      elements.questTimerLabel.textContent = getTimeUntilMidnightText();
+    }
+  }, 60000);
+}
+
 function bootDashboard() {
   if (!token) {
     redirectToLogin();
@@ -990,11 +1260,14 @@ function bootDashboard() {
 
   inputs.runDate.value = getTodayKey();
   inputs.runDate.max = getTodayKey();
+  selectedCalendarDate = getTodayKey();
   inputs.goalGateDate.value = getDefaultGoalDate();
   inputs.goalGateDate.min = getTodayKey();
   inputs.goalDate.value = getDefaultGoalDate();
   inputs.goalDate.min = getTodayKey();
+  updateQuestOutcomeFields();
   bindEvents();
+  startQuestTimer();
   loadDashboard();
 }
 

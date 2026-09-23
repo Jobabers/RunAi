@@ -171,6 +171,15 @@ function findAdjustmentById(adjustmentId) {
   ) || null;
 }
 
+function findPendingAdjustmentForPlan(planId) {
+  return db.plan_adjustments
+    .filter((adjustment) => (
+      adjustment.training_plan_id === Number(planId)
+      && adjustment.status === 'pending'
+    ))
+    .sort((a, b) => b.plan_adjustment_id - a.plan_adjustment_id)[0] || null;
+}
+
 function updateRecord(table, idValue, attrs) {
   const idName = idNames[table];
   const record = db[table].find((item) => (
@@ -244,10 +253,7 @@ function serializePlan(plan) {
     ...plan,
     sessions: getPlanSessions(plan.training_plan_id),
     calendar: getPlanCalendar(plan),
-    pending_adjustment: db.plan_adjustments.find(
-      (adjustment) => adjustment.training_plan_id === plan.training_plan_id
-        && adjustment.status === 'pending',
-    ) || null,
+    pending_adjustment: findPendingAdjustmentForPlan(plan.training_plan_id),
   };
 }
 
@@ -268,6 +274,7 @@ module.exports = {
   findActivePlan,
   findGoalById,
   findGoalForUser,
+  findPendingAdjustmentForPlan,
   findPlanById,
   findPlanForUser,
   findProgressBySessionId,

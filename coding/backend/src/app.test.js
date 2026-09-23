@@ -184,6 +184,14 @@ test('supports the first RunAI quest workflow', async (t) => {
   });
   assert.equal(activePlanWithAdjustment.response.status, 200);
   assert.equal(activePlanWithAdjustment.data.plan.pending_adjustment.status, 'pending');
+  assert.equal(store.db.plan_adjustments.length, 1);
+
+  const repeatedActivePlanRead = await request(baseUrl, '/training-plans/active', {
+    token,
+  });
+  assert.equal(repeatedActivePlanRead.response.status, 200);
+  assert.equal(repeatedActivePlanRead.data.plan.pending_adjustment.plan_adjustment_id, failed.data.pending_adjustment.plan_adjustment_id);
+  assert.equal(store.db.plan_adjustments.length, 1);
 
   const acceptedAdjustment = await request(
     baseUrl,
