@@ -18,3 +18,19 @@ test('creates daily quest sessions with rest days and locked future status', () 
   assert.equal(sessions[1].status, 'locked');
   assert.ok(sessions.every((session) => session.target_distance <= 10));
 });
+
+test('creates sprint 2 quest sessions through the goal target date', () => {
+  const goal = { target_distance: 10 };
+  const runs = [{ distance: 5, duration_minutes: 32 }];
+  const sessions = createTrainingSessions({
+    startDate: '2026-09-23',
+    endDate: '2026-10-23',
+    goal,
+    runs,
+  });
+
+  assert.ok(sessions.length > 10);
+  assert.equal(sessions[0].session_date, '2026-09-23');
+  assert.ok(sessions.some((session) => session.session_date === '2026-10-23'));
+  assert.ok(sessions.every((session) => session.target_distance <= 10));
+});

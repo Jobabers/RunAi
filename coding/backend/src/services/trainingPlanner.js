@@ -1,4 +1,4 @@
-const { addDays, toDateKey } = require('../utils/dates');
+const { addDays, compareDateKey, toDateKey } = require('../utils/dates');
 
 const TRAINING_TYPES = ['Easy Run', 'Tempo Run', 'Long Run'];
 
@@ -47,10 +47,28 @@ function estimateDurationMinutes(distance, runs) {
   return Math.max(10, Math.round(distance * pace));
 }
 
-function createTrainingSessions({ startDate = toDateKey(), weeks = 2, goal, runs = [] }) {
+function getInclusiveDayCount(startDate, endDate) {
+  if (!endDate || compareDateKey(endDate, startDate) < 0) {
+    return null;
+  }
+
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T00:00:00`);
+  const dayMs = 24 * 60 * 60 * 1000;
+
+  return Math.floor((end - start) / dayMs) + 1;
+}
+
+function createTrainingSessions({
+  startDate = toDateKey(),
+  endDate = null,
+  weeks = 2,
+  goal,
+  runs = [],
+}) {
   const baseline = getBaselineDistance(runs);
   const sessions = [];
-  const totalDays = weeks * 7;
+  const totalDays = getInclusiveDayCount(startDate, endDate) || weeks * 7;
 
   for (let day = 0; day < totalDays; day += 1) {
     const isRestDay = day % 3 === 1 || day % 7 === 6;

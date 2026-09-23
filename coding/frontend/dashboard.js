@@ -24,6 +24,18 @@ const elements = {
   foundationActionStat: document.getElementById('foundationActionStat'),
   foundationActionMeta: document.getElementById('foundationActionMeta'),
   quickRecordButton: document.getElementById('quickRecordButton'),
+  questPanel: document.getElementById('questPanel'),
+  questPanelTitle: document.getElementById('questPanelTitle'),
+  questPanelText: document.getElementById('questPanelText'),
+  questStatusPill: document.getElementById('questStatusPill'),
+  questMeta: document.getElementById('questMeta'),
+  questMetrics: document.getElementById('questMetrics'),
+  questAdjustment: document.getElementById('questAdjustment'),
+  questAdjustmentTitle: document.getElementById('questAdjustmentTitle'),
+  questAdjustmentText: document.getElementById('questAdjustmentText'),
+  questSubmitForm: document.getElementById('questSubmitForm'),
+  generatePlanButton: document.getElementById('generatePlanButton'),
+  acceptAdjustmentButton: document.getElementById('acceptAdjustmentButton'),
   recentRunsList: document.getElementById('recentRunsList'),
   progressChartBars: document.getElementById('progressChartBars'),
   progressChartMeta: document.getElementById('progressChartMeta'),
@@ -65,6 +77,8 @@ const inputs = {
   runDistance: document.getElementById('runDistanceInput'),
   runDuration: document.getElementById('runDurationInput'),
   runType: document.getElementById('runTypeInput'),
+  questDistance: document.getElementById('questDistanceInput'),
+  questDuration: document.getElementById('questDurationInput'),
 };
 
 let dashboardState = {
@@ -168,7 +182,55 @@ function getActiveGoal(goals) {
   return goals.find((goal) => goal.status === 'active') || null;
 }
 
-function getGoalProgressPercent(goal, runs) {
+function getTodayQuest() {
+  const today = getTodayKey();
+  return (dashboardState.activePlan?.sessions || [])
+    .find((session) => session.session_date === today) || null;
+}
+
+function getUpcomingQuest(fromDate = getTodayKey()) {
+  return (dashboardState.activePlan?.sessions || [])
+    .find((session) => session.session_date > fromDate) || null;
+}
+
+function getQuestStatusText(status) {
+  const labels = {
+    available: 'Available',
+    locked: 'Locked',
+    completed: 'Completed',
+    failed: 'Failed',
+    expired: 'Expired',
+    rest: 'Rest Day',
+  };
+
+  return labels[status] || 'No Plan';
+}
+
+function getQuestTypeLabel(session) {
+  if (!session) return 'Rest Day';
+  return session.training_type || 'Quest Run';
+}
+
+function getPlanProgress(plan) {
+  const sessions = plan?.sessions || [];
+  const total = sessions.length;
+  const completed = sessions.filter((session) => session.status === 'completed').length;
+  const closed = sessions.filter((session) => ['completed', 'failed', 'expired'].includes(session.status)).length;
+
+  return {
+    total,
+    completed,
+    closed,
+    percent: total ? Math.round((completed / total) * 100) : 0,
+  };
+}
+
+function getGoalProgressPercent(goal, runs, plan = null) {
+  const planProgress = getPlanProgress(plan);
+  if (planProgress.total) {
+    return planProgress.percent;
+  }
+
   const totalDistance = runs.reduce((sum, run) => sum + Number(run.distance || 0), 0);
   const targetDistance = Number(goal?.target_distance || 0);
 
@@ -214,9 +276,11 @@ function renderUser(user) {
 function renderStats() {
   const { goals, runs, user } = dashboardState;
   const activeGoal = getActiveGoal(goals);
+  const todayQuest = getTodayQuest();
+  const planProgress = getPlanProgress(dashboardState.activePlan);
   const totalDistance = runs.reduce((sum, run) => sum + Number(run.distance || 0), 0);
   const totalDuration = runs.reduce((sum, run) => sum + Number(run.duration_minutes || 0), 0);
-  const goalPercent = getGoalProgressPercent(activeGoal, runs);
+  const goalPercent = getGoalProgressPercent(activeGoal, runs, dashboardState.activePlan);
   const week = getWeekRange();
   const weeklyDistance = runs
     .filter((run) => run.run_date >= week.start && run.run_date <= week.end)
@@ -228,7 +292,9 @@ function renderStats() {
 
   if (activeGoal) {
     elements.activeGoalStat.textContent = formatDistance(activeGoal.target_distance);
-    elements.activeGoalMeta.textContent = `${goalPercent}% · ภายใน ${formatDate(activeGoal.target_date)}`;
+    elements.activeGoalMeta.textContent = planProgress.total
+      ? `${planProgress.completed}/${planProgress.total} quests · ภายใน ${formatDate(activeGoal.target_date)}`
+      : `${goalPercent}% · ภายใน ${formatDate(activeGoal.target_date)}`;
   } else {
     elements.activeGoalStat.textContent = '-';
     elements.activeGoalMeta.textContent = 'ยังไม่มีเป้าหมาย';
@@ -248,8 +314,16 @@ function renderStats() {
     elements.nextActionText.textContent = 'กรอกระยะทางและเวลาการวิ่งครั้งแรกก่อนเริ่มใช้งาน';
   } else if (!activeGoal) {
     elements.nextActionText.textContent = 'ต่อไปสร้างเป้าหมายการวิ่งของคุณ';
+  } else if (!dashboardState.activePlan) {
+    elements.nextActionText.textContent = 'สร้าง Training Plan เพื่อเริ่มเควสรายวัน';
+  } else if (todayQuest?.status === 'available') {
+    elements.nextActionText.textContent = 'วันนี้มี Daily Quest ให้ส่งผลก่อนหมดวัน';
+  } else if (todayQuest && ['completed', 'failed', 'expired'].includes(todayQuest.status)) {
+    elements.nextActionText.textContent = 'เควสวันนี้ถูกปิดแล้ว รอดูเควสวันถัดไป';
+  } else if (dashboardState.activePlan) {
+    elements.nextActionText.textContent = 'วันนี้เป็น Rest Day ไม่มีเควสให้ส่งผล';
   } else {
-    elements.nextActionText.textContent = 'Sprint 1 flow พร้อมแล้ว ต่อไปค่อยต่อ AI plan';
+    elements.nextActionText.textContent = 'RunAI พร้อมสร้างแผนฝึกของคุณ';
   }
 }
 
@@ -260,6 +334,133 @@ function renderGoalFormState() {
   elements.goalLockedNote.classList.toggle('hidden', !isLocked);
   elements.goalForm.querySelectorAll('input, select, button').forEach((control) => {
     control.disabled = isLocked;
+  });
+}
+
+function setQuestPanelState({
+  status,
+  title,
+  text,
+  meta,
+  metrics = [],
+  adjustment = null,
+  showForm = false,
+  showGenerate = false,
+}) {
+  elements.questPanelTitle.textContent = title;
+  elements.questPanelText.textContent = text;
+  elements.questStatusPill.textContent = getQuestStatusText(status);
+  elements.questStatusPill.className = `quest-status-pill ${status || 'empty'}`;
+  elements.questMeta.textContent = meta;
+  elements.questSubmitForm.classList.toggle('hidden', !showForm);
+  elements.generatePlanButton.classList.toggle('hidden', !showGenerate);
+  elements.questAdjustment.classList.toggle('hidden', !adjustment);
+
+  if (adjustment) {
+    const proposedCount = Array.isArray(adjustment.proposed_sessions)
+      ? adjustment.proposed_sessions.length
+      : 0;
+    elements.questAdjustmentTitle.textContent = 'AI เตรียมแผนปรับใหม่ไว้แล้ว';
+    elements.questAdjustmentText.textContent = proposedCount
+      ? `${proposedCount} เควสถัดไปจะถูกปรับหลังจากกดยอมรับ`
+      : 'ไม่มีเควสอนาคตให้ปรับ แต่ระบบบันทึกผลวิเคราะห์ไว้แล้ว';
+    elements.acceptAdjustmentButton.disabled = false;
+  }
+
+  elements.questMetrics.innerHTML = metrics.map((item) => `
+    <div class="quest-metric">
+      <span>${escapeHtml(item.label)}</span>
+      <strong>${escapeHtml(item.value)}</strong>
+    </div>
+  `).join('');
+}
+
+function renderQuestPanel() {
+  const activeGoal = getActiveGoal(dashboardState.goals);
+  const activePlan = dashboardState.activePlan;
+  const todayQuest = getTodayQuest();
+  const pendingAdjustment = activePlan?.pending_adjustment || null;
+
+  if (!activeGoal) {
+    setQuestPanelState({
+      status: 'empty',
+      title: 'ยังไม่มี Goal',
+      text: 'สร้าง Active Goal ก่อน แล้ว RunAI จะสร้าง Training Plan ให้ใน Sprint 2',
+      meta: 'รอข้อมูลเป้าหมาย',
+    });
+    return;
+  }
+
+  if (!activePlan) {
+    setQuestPanelState({
+      status: 'empty',
+      title: 'ยังไม่มี Training Plan',
+      text: 'สร้างแผนฝึกจาก Active Goal เพื่อเปิดระบบ Daily Quest รายวัน',
+      meta: `${formatDistance(activeGoal.target_distance)} · เป้าหมาย ${formatDate(activeGoal.target_date)}`,
+      metrics: [
+        { label: 'Goal', value: formatDistance(activeGoal.target_distance) },
+        { label: 'Target Date', value: formatDate(activeGoal.target_date) },
+      ],
+      showGenerate: true,
+    });
+    return;
+  }
+
+  if (!todayQuest) {
+    const nextQuest = getUpcomingQuest();
+    setQuestPanelState({
+      status: 'rest',
+      title: 'วันนี้ไม่มีเควส',
+      text: 'วันนี้เป็น Rest Day ไม่ต้อง Submit และระบบจะไม่สร้าง Training Progress',
+      meta: `Plan v${activePlan.version || 1} · ${formatDate(activePlan.start_date)} - ${formatDate(activePlan.end_date)}`,
+      metrics: [
+        { label: 'Quest', value: 'Rest Day' },
+        { label: 'Next Quest', value: nextQuest ? formatDate(nextQuest.session_date) : 'ยังไม่มี' },
+        { label: 'Action', value: 'ไม่ต้องส่งผล' },
+      ],
+      adjustment: pendingAdjustment,
+    });
+    return;
+  }
+
+  const targetDistance = Number(todayQuest.target_distance || 0);
+  const targetDuration = todayQuest.target_duration_minutes
+    ? `${todayQuest.target_duration_minutes} min`
+    : '-';
+  const baseMetrics = [
+    { label: 'Type', value: getQuestTypeLabel(todayQuest) },
+    { label: 'Distance', value: formatDistance(targetDistance) },
+    { label: 'Target Time', value: targetDuration },
+  ];
+
+  if (todayQuest.status === 'available') {
+    setQuestPanelState({
+      status: 'available',
+      title: `วันนี้: ${getQuestTypeLabel(todayQuest)}`,
+      text: todayQuest.note || 'ทำเควสตามแผน แล้วส่งระยะทางจริงกับเวลาที่ใช้ก่อนหมดวัน',
+      meta: `หมดเวลาเมื่อขึ้นวันใหม่ · ${formatDate(todayQuest.session_date)}`,
+      metrics: baseMetrics,
+      adjustment: pendingAdjustment,
+      showForm: true,
+    });
+    return;
+  }
+
+  const closedText = todayQuest.status === 'completed'
+    ? 'เควสนี้สำเร็จแล้ว ส่งซ้ำหรือแก้ไขไม่ได้'
+    : todayQuest.status === 'failed'
+      ? 'เควสนี้ถูกบันทึกว่าไม่สำเร็จแล้ว ส่งซ้ำหรือแก้ไขไม่ได้'
+      : todayQuest.status === 'expired'
+        ? 'เควสนี้หมดเวลาแล้ว ระบบจะเตรียมข้อมูลสำหรับปรับแผน'
+        : 'เควสนี้ยังไม่เปิดให้ส่งผล';
+
+  setQuestPanelState({
+    status: todayQuest.status,
+    title: `${getQuestTypeLabel(todayQuest)} · ${getQuestStatusText(todayQuest.status)}`,
+    text: closedText,
+    meta: `Quest date · ${formatDate(todayQuest.session_date)}`,
+    metrics: baseMetrics,
+    adjustment: pendingAdjustment,
   });
 }
 
@@ -348,27 +549,47 @@ function getPlanSessionsByDate(plan) {
   }, new Map());
 }
 
-function getCalendarCell({ key, day, outsideMonth, run, session, today }) {
+function getPlanCalendarByDate(plan) {
+  const days = plan?.calendar || [];
+  return days.reduce((groups, day) => {
+    groups.set(day.date, day);
+    return groups;
+  }, new Map());
+}
+
+function getCalendarCell({ key, day, outsideMonth, run, session, planDay, today }) {
   const isToday = key === today;
-  let state = 'rest';
-  let label = 'Rest';
+  let state = '';
+  let label = '';
   let detail = '';
 
   if (session) {
     const targetDistance = Number(session.target_distance || 0);
-    label = `${session.training_type || 'Run'}${targetDistance ? ` ${formatDistance(targetDistance)}` : ''}`;
-    state = targetDistance ? (isToday ? 'today planned' : 'planned') : 'rest';
-    detail = targetDistance ? 'Plan preview' : 'Rest';
-  }
+    label = targetDistance
+      ? `${session.training_type || 'Run'} ${formatDistance(targetDistance)}`
+      : session.training_type || 'Rest';
+    state = session.status || 'planned';
+    detail = getQuestStatusText(session.status);
 
-  if (run) {
+    if (session.status === 'available' && isToday) {
+      state = 'today available';
+      detail = 'Today Quest';
+    } else if (session.status === 'locked') {
+      state = 'planned';
+      detail = 'Plan Preview';
+    }
+  } else if (run) {
     state = isToday ? 'today completed' : 'completed';
     label = formatDistance(run.distance);
     detail = run.count > 1 ? `${run.count} runs` : 'Completed';
+  } else if (planDay) {
+    state = isToday ? 'today rest' : 'rest';
+    label = 'Rest Day';
+    detail = 'No Quest';
   } else if (!session && isToday) {
     state = 'today';
     label = 'Today';
-    detail = 'No run yet';
+    detail = dashboardState.activePlan ? 'Rest Day' : 'No plan';
   }
 
   return `
@@ -387,6 +608,7 @@ function renderCalendar() {
   const today = getTodayKey();
   const runsByDate = groupRunsByDate(dashboardState.runs);
   const sessionsByDate = getPlanSessionsByDate(dashboardState.activePlan);
+  const planDaysByDate = getPlanCalendarByDate(dashboardState.activePlan);
   const firstDay = new Date(year, month, 1);
   const offset = (firstDay.getDay() + 6) % 7;
   const gridStart = new Date(year, month, 1 - offset);
@@ -395,10 +617,11 @@ function renderCalendar() {
   const monthSessions = [...sessionsByDate.values()].filter((session) => String(session.session_date).startsWith(monthKey));
   const completedCount = monthRuns.length;
   const plannedCount = monthSessions.length;
+  const questDoneCount = monthSessions.filter((session) => ['completed', 'failed', 'expired'].includes(session.status)).length;
 
   elements.calendarTitle.textContent = monthFormatter.format(calendarCursor);
   elements.calendarSummary.textContent = plannedCount
-    ? `${completedCount} running records · ${plannedCount} plan preview days`
+    ? `${questDoneCount}/${plannedCount} quests closed · ${completedCount} running records`
     : `${completedCount} running records · Sprint 1 foundation`;
 
   const cells = [];
@@ -413,6 +636,7 @@ function renderCalendar() {
       outsideMonth: date.getMonth() !== month,
       run: runsByDate.get(key),
       session: sessionsByDate.get(key),
+      planDay: planDaysByDate.get(key),
       today,
     }));
   }
@@ -441,6 +665,7 @@ function renderDashboard() {
   renderGateFlow();
   renderStats();
   renderGoalFormState();
+  renderQuestPanel();
   renderHistory();
   renderRecentRuns();
   renderProgressChart();
@@ -563,18 +788,36 @@ function buildGoalPayload(sourceInputs) {
   return payload;
 }
 
+async function generateTrainingPlan(goalId = null) {
+  const activeGoal = getActiveGoal(dashboardState.goals);
+  const targetGoalId = goalId || activeGoal?.goal_id;
+
+  if (!targetGoalId) {
+    throw new Error('ต้องมี Active Goal ก่อนสร้าง Training Plan');
+  }
+
+  const data = await apiFetch('/training-plans/generate', {
+    method: 'POST',
+    body: JSON.stringify({ goal_id: targetGoalId }),
+  });
+
+  dashboardState.activePlan = data.plan;
+  return data.plan;
+}
+
 async function saveGoal(payload, successMessage) {
   try {
-    await apiFetch('/goals', {
+    const goalData = await apiFetch('/goals', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
+    await generateTrainingPlan(goalData.goal.goal_id);
     elements.goalGateForm.reset();
     elements.goalForm.reset();
     inputs.goalGateDate.value = getDefaultGoalDate();
     inputs.goalDate.value = getDefaultGoalDate();
-    showDashboardMessage(successMessage);
     await loadDashboard();
+    showDashboardMessage(`${successMessage} และสร้าง Training Plan แล้ว`);
   } catch (error) {
     showDashboardMessage(error.message, 'error');
   }
@@ -629,6 +872,87 @@ async function handleRunSubmit(event) {
   }
 }
 
+async function handleGeneratePlanClick() {
+  showDashboardMessage('');
+  elements.generatePlanButton.disabled = true;
+  try {
+    await generateTrainingPlan();
+    await loadDashboard();
+    showDashboardMessage('สร้าง Training Plan และเปิด Daily Quest แล้ว');
+  } catch (error) {
+    showDashboardMessage(error.message, 'error');
+  } finally {
+    elements.generatePlanButton.disabled = false;
+  }
+}
+
+async function handleQuestSubmit(event) {
+  event.preventDefault();
+  showDashboardMessage('');
+
+  const todayQuest = getTodayQuest();
+  if (!todayQuest) {
+    showDashboardMessage('วันนี้ไม่มีเควสให้ส่งผล', 'error');
+    return;
+  }
+
+  const actualDistance = Number(inputs.questDistance.value);
+  const actualDuration = Number(inputs.questDuration.value);
+  const targetDistance = Number(todayQuest.target_distance || 0);
+  const payload = {
+    actual_distance: actualDistance,
+    actual_duration_minutes: actualDuration,
+  };
+
+  const isCompleted = actualDistance >= targetDistance;
+  const endpoint = isCompleted
+    ? `/training-sessions/${todayQuest.training_session_id}/submit`
+    : `/training-sessions/${todayQuest.training_session_id}/fail`;
+
+  if (!isCompleted) {
+    payload.failure_reason = `วิ่งได้ ${formatDistance(actualDistance)} จากเป้าหมาย ${formatDistance(targetDistance)}`;
+  }
+
+  elements.questSubmitForm.querySelector('button[type="submit"]').disabled = true;
+
+  try {
+    await apiFetch(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    elements.questSubmitForm.reset();
+    await loadDashboard();
+    showDashboardMessage(isCompleted ? 'ส่งเควสสำเร็จแล้ว' : 'บันทึกเควสไม่สำเร็จแล้ว', isCompleted ? 'success' : 'error');
+  } catch (error) {
+    showDashboardMessage(error.message, 'error');
+  } finally {
+    elements.questSubmitForm.querySelector('button[type="submit"]').disabled = false;
+  }
+}
+
+async function handleAcceptAdjustmentClick() {
+  const adjustmentId = dashboardState.activePlan?.pending_adjustment?.plan_adjustment_id;
+  if (!adjustmentId) {
+    showDashboardMessage('ยังไม่มีแผนปรับใหม่ให้ยอมรับ', 'error');
+    return;
+  }
+
+  showDashboardMessage('');
+  elements.acceptAdjustmentButton.disabled = true;
+
+  try {
+    await apiFetch(`/training-plans/adjustments/${adjustmentId}/accept`, {
+      method: 'POST',
+    });
+    await loadDashboard();
+    showDashboardMessage('ยอมรับแผนที่ AI ปรับให้แล้ว');
+  } catch (error) {
+    showDashboardMessage(error.message, 'error');
+  } finally {
+    elements.acceptAdjustmentButton.disabled = false;
+  }
+}
+
 function bindEvents() {
   elements.logoutButton.addEventListener('click', redirectToLogin);
   elements.profileGateForm.addEventListener('submit', handleProfileGateSubmit);
@@ -637,6 +961,9 @@ function bindEvents() {
   elements.profileForm.addEventListener('submit', handleProfileSubmit);
   elements.goalForm.addEventListener('submit', handleGoalSubmit);
   elements.runForm.addEventListener('submit', handleRunSubmit);
+  elements.generatePlanButton.addEventListener('click', handleGeneratePlanClick);
+  elements.acceptAdjustmentButton.addEventListener('click', handleAcceptAdjustmentClick);
+  elements.questSubmitForm.addEventListener('submit', handleQuestSubmit);
   elements.calendarPrevButton.addEventListener('click', () => {
     calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() - 1, 1);
     renderCalendar();

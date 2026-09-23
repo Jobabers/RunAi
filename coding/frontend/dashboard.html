@@ -26,7 +26,7 @@
   <main class="dashboard-page">
     <section class="dashboard-intro" aria-labelledby="dashboardTitle">
       <div>
-        <p class="eyebrow">Sprint 1</p>
+        <p class="eyebrow">Sprint 2</p>
         <h1 id="dashboardTitle">Dashboard</h1>
         <p id="nextActionText">กำลังตรวจสอบข้อมูลของคุณ</p>
       </div>
@@ -147,11 +147,49 @@
           <small id="latestRunMeta">นาทีต่อกิโลเมตร</small>
         </article>
         <article class="stat-card foundation-action-card">
-          <span>Sprint 1 Action</span>
+          <span>Running Record</span>
           <strong id="foundationActionStat">Add Record</strong>
           <small id="foundationActionMeta">บันทึก Running Record เพื่อใช้วิเคราะห์พื้นฐาน</small>
           <button class="primary-button compact-action-button" id="quickRecordButton" type="button">Add Record</button>
         </article>
+      </section>
+
+      <section class="dashboard-panel quest-panel" id="questPanel" aria-labelledby="questPanelTitle">
+        <div class="quest-copy">
+          <p class="eyebrow">Daily Quest</p>
+          <h2 id="questPanelTitle">กำลังโหลดเควสวันนี้</h2>
+          <p id="questPanelText">RunAI จะสร้างเควสจาก Active Goal และ Training Plan ของคุณ</p>
+        </div>
+        <div class="quest-card" id="questCard">
+          <div class="quest-status-row">
+            <span class="quest-status-pill" id="questStatusPill">Loading</span>
+            <small id="questMeta">ตรวจสอบแผนฝึก...</small>
+          </div>
+          <div class="quest-metrics" id="questMetrics"></div>
+          <div class="quest-adjustment hidden" id="questAdjustment">
+            <div>
+              <span>AI Plan Adjustment</span>
+              <strong id="questAdjustmentTitle">มีแผนปรับใหม่รออยู่</strong>
+              <p id="questAdjustmentText">ระบบจะไม่ใช้แผนใหม่จนกว่าคุณจะกดยอมรับ</p>
+            </div>
+            <button class="ghost-button quest-adjustment-button" id="acceptAdjustmentButton" type="button">Accept Plan</button>
+          </div>
+          <form class="quest-submit-form hidden" id="questSubmitForm">
+            <div class="two-column dashboard-columns">
+              <label class="field">
+                <span>ระยะทางจริง</span>
+                <input id="questDistanceInput" min="0.1" placeholder="km" required step="0.1" type="number">
+              </label>
+              <label class="field">
+                <span>เวลาที่ใช้จริง</span>
+                <input id="questDurationInput" min="1" placeholder="minutes" required type="number">
+              </label>
+            </div>
+            <p class="quest-rule-note">ระบบใช้ระยะทางเป็นเกณฑ์ผ่านเควส และส่งผลได้ครั้งเดียว</p>
+            <button class="primary-button" type="submit">Submit Quest</button>
+          </form>
+          <button class="primary-button quest-generate-button hidden" id="generatePlanButton" type="button">Generate Training Plan</button>
+        </div>
       </section>
 
       <section class="dashboard-main-grid" aria-label="Running foundation overview">
@@ -172,6 +210,7 @@
           <div class="training-calendar" id="trainingCalendar" aria-live="polite"></div>
           <div class="calendar-legend" aria-label="คำอธิบายสถานะ">
             <span><i class="legend-run"></i> Completed</span>
+            <span><i class="legend-failed"></i> Failed / Expired</span>
             <span><i class="legend-today"></i> Today</span>
             <span><i class="legend-plan"></i> Plan Preview</span>
             <span><i class="legend-rest"></i> Rest</span>

@@ -72,6 +72,13 @@ router.post('/training-sessions/:sessionId/fail', async (req, res, next) => {
 
     await assertSubmittable(session);
     assertCondition(req.body.failure_reason, 400, 'กรุณาระบุเหตุผลที่ทำเควสไม่สำเร็จ');
+    if (req.body.actual_distance) {
+      assertCondition(
+        Number(req.body.actual_distance) < Number(session.target_distance),
+        422,
+        'ระยะทางถึงเป้าแล้ว กรุณาส่งเป็นเควสสำเร็จ',
+      );
+    }
 
     let run = null;
     if (req.body.actual_distance && req.body.actual_duration_minutes) {
