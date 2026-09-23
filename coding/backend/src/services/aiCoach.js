@@ -2,6 +2,7 @@ const config = require('../config');
 const { compareDateKey } = require('../utils/dates');
 
 const GEMINI_INTERACTIONS_URL = 'https://generativelanguage.googleapis.com/v1beta/interactions';
+const GEMINI_GENERATE_CONTENT_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const TRAINING_TYPES = new Set(['Easy Run', 'Tempo Run', 'Long Run', 'Recovery Run']);
 
 const planResponseSchema = {
@@ -45,6 +46,14 @@ function extractGeminiText(data) {
 
   if (text) return text;
 
+  const interactionText = (data?.steps || [])
+    .flatMap((step) => step.content || [])
+    .map((part) => part.text)
+    .filter(Boolean)
+    .join('\n');
+
+  if (interactionText) return interactionText;
+
   throw new Error('Gemini did not return text output');
 }
 
@@ -79,7 +88,7 @@ function sanitizeSessions(rawSessions, { startDate, endDate, goal }) {
   const maxDistance = Math.max(1, Number(goal?.target_distance || 1));
   const seenDates = new Set();
 
-  return (Array.isArray(rawSessions) ? rawSessions : [])
+  const sessions = (Array.isArray(rawSessions) ? rawSessions : [])
     .map((session) => {
       const sessionDate = String(session.session_date || '').slice(0, 10);
       const targetDistance = toFiniteNumber(session.target_distance);
@@ -103,6 +112,12 @@ function sanitizeSessions(rawSessions, { startDate, endDate, goal }) {
     })
     .filter(Boolean)
     .sort((left, right) => compareDateKey(left.session_date, right.session_date));
+
+  if (sessions.length && !sessions.some((session) => session.status === 'available')) {
+    sessions[0].status = 'available';
+  }
+
+  return sessions;
 }
 
 function buildRunnerContext({ user, goal, runs }) {
@@ -129,24 +144,14 @@ function buildRunnerContext({ user, goal, runs }) {
   };
 }
 
-async function callGeminiJson({ systemInstruction, input, schema }) {
-  const response = await fetch(GEMINI_INTERACTIONS_URL, {
+async function postGeminiJson(url, body) {
+  const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'x-goog-api-key': config.ai.geminiApiKey,
     },
-    body: JSON.stringify({
-      model: config.ai.model,
-      store: false,
-      system_instruction: systemInstruction,
-      input,
-      response_format: {
-        type: 'text',
-        mime_type: 'application/json',
-        schema,
-      },
-    }),
+    body: JSON.stringify(body),
   });
 
   const text = await response.text();
@@ -164,6 +169,76 @@ async function callGeminiJson({ systemInstruction, input, schema }) {
   return parseJsonOutput(extractGeminiText(data));
 }
 
+async function callInteractionsJson({ prompt, systemInstruction, schema }) {
+  return postGeminiJson(GEMINI_INTERACTIONS_URL, {
+    model: config.ai.model,
+    store: false,
+    system_instruction: systemInstruction,
+    input: prompt,
+    response_format: {
+      type: 'text',
+      mime_type: 'application/json',
+      schema,
+    },
+  });
+}
+
+async function callGenerateContentJson({ prompt, systemInstruction, schema }) {
+  const url = `${GEMINI_GENERATE_CONTENT_URL}/${encodeURIComponent(config.ai.model)}:generateContent`;
+  const baseBody = {
+    contents: [{
+      role: 'user',
+      parts: [{ text: prompt }],
+    }],
+    systemInstruction: {
+      parts: [{ text: systemInstruction }],
+    },
+  };
+
+  try {
+    return await postGeminiJson(url, {
+      ...baseBody,
+      generationConfig: {
+        responseFormat: {
+          text: {
+            mimeType: 'application/json',
+            schema,
+          },
+        },
+      },
+    });
+  } catch (error) {
+    return postGeminiJson(url, {
+      ...baseBody,
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: schema,
+      },
+    });
+  }
+}
+
+async function callGeminiJson({ systemInstruction, input, schema }) {
+  const prompt = [
+    'Use this JSON context to produce the requested RunAI training output.',
+    JSON.stringify(input, null, 2),
+  ].join('\n\n');
+
+  if (/^gemini-[12]\./.test(config.ai.model)) {
+    return callGenerateContentJson({ prompt, systemInstruction, schema });
+  }
+
+  try {
+    return await callInteractionsJson({ prompt, systemInstruction, schema });
+  } catch (error) {
+    if (/high demand|fetch failed|input/i.test(error.message)) {
+      return callGenerateContentJson({ prompt, systemInstruction, schema });
+    }
+
+    throw error;
+  }
+}
+
 function fallbackResult({ sessions, trigger, reason = null }) {
   return {
     enabled: false,
@@ -175,6 +250,26 @@ function fallbackResult({ sessions, trigger, reason = null }) {
     reason,
     sessions,
   };
+}
+
+function ensureStartDateQuest(sessions, fallbackSessions, startDate) {
+  if (!startDate || sessions.some((session) => session.session_date === startDate)) {
+    return sessions;
+  }
+
+  const starterQuest = fallbackSessions.find((session) => session.session_date === startDate);
+  if (!starterQuest) {
+    return sessions;
+  }
+
+  return [
+    {
+      ...starterQuest,
+      status: 'available',
+      note: starterQuest.note || 'เควสเริ่มต้นจาก RunAI เพื่อเปิด Daily Quest วันนี้',
+    },
+    ...sessions,
+  ].sort((left, right) => compareDateKey(left.session_date, right.session_date));
 }
 
 async function createInitialPlan({ user, goal, runs, startDate, endDate, fallbackSessions }) {
@@ -200,7 +295,11 @@ async function createInitialPlan({ user, goal, runs, startDate, endDate, fallbac
       },
       schema: planResponseSchema,
     });
-    const sessions = sanitizeSessions(aiResult.sessions, { startDate, endDate, goal });
+    const sessions = ensureStartDateQuest(
+      sanitizeSessions(aiResult.sessions, { startDate, endDate, goal }),
+      fallbackSessions,
+      startDate,
+    );
 
     if (!sessions.length) {
       return fallbackResult({ sessions: fallbackSessions, trigger: 'initial_plan', reason: 'Gemini returned no valid sessions' });

@@ -262,10 +262,7 @@ async function serializePlan(plan) {
   await refreshPlanState(plan);
 
   const sessions = await getPlanSessions(plan.training_plan_id);
-  const pendingAdjustment = await selectOne('plan_adjustments', [
-    ['training_plan_id', 'eq', plan.training_plan_id],
-    ['status', 'eq', 'pending'],
-  ]);
+  const pendingAdjustment = await findPendingAdjustmentForPlan(plan.training_plan_id);
 
   return {
     ...plan,
@@ -297,6 +294,13 @@ function findAdjustmentById(adjustmentId) {
   return selectOne('plan_adjustments', [['plan_adjustment_id', 'eq', adjustmentId]]);
 }
 
+function findPendingAdjustmentForPlan(planId) {
+  return selectOne('plan_adjustments', [
+    ['training_plan_id', 'eq', planId],
+    ['status', 'eq', 'pending'],
+  ], { order: 'created_at.desc' });
+}
+
 function resetForTests() {
   throw new Error('resetForTests is available only for memory storage');
 }
@@ -310,6 +314,7 @@ module.exports = {
   findAdjustmentById,
   findGoalById,
   findGoalForUser,
+  findPendingAdjustmentForPlan,
   findPlanById,
   findPlanForUser,
   findProgressBySessionId,

@@ -16,6 +16,8 @@ RunAI is a web application for improving running performance with AI-assisted tr
 - Quest submission with distance as the pass/fail criterion
 - Calendar connected to training sessions and quest status
 - Pending plan adjustment notice after a failed or expired quest
+- Plan adjustment review with current-vs-proposed quest preview
+- Accept or reject pending AI plan adjustments
 - Optional Gemini AI planner with rule-based fallback
 - Plain HTML/CSS/JavaScript frontend connected to the API
 - Current frontend screen set: login, register, profile, goal, run, history, and Sprint 2 dashboard
@@ -82,7 +84,7 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 # Optional AI planner.
 # Leave as rule-based if you do not have a Gemini key yet.
 AI_PROVIDER=rule-based
-AI_MODEL=gemini-3.8-flash
+AI_MODEL=gemini-3.5-flash-lite
 GEMINI_API_KEY=your-gemini-api-key
 ```
 
@@ -113,6 +115,10 @@ create unique index if not exists uq_goals_one_active_per_user
 create unique index if not exists uq_training_plans_one_active_per_user
   on training_plans (user_id)
   where status = 'active';
+
+create unique index if not exists uq_plan_adjustments_one_pending_per_plan
+  on plan_adjustments (training_plan_id)
+  where status = 'pending';
 ```
 
 ### 5. Start the Project
@@ -160,7 +166,7 @@ To enable Gemini:
 
 ```env
 AI_PROVIDER=gemini
-AI_MODEL=gemini-3.8-flash
+AI_MODEL=gemini-3.5-flash-lite
 GEMINI_API_KEY=your-gemini-api-key
 ```
 
@@ -199,6 +205,22 @@ node --check server.js
 
 The frontend starts from authentication, then redirects logged-in users to `dashboard.html`. New users must complete Profile, enter their first run distance and duration, then create a Goal. Sprint 2 automatically generates a Training Plan from that Goal and unlocks the Daily Quest dashboard.
 
+### Supabase + Gemini End-to-End Checklist
+
+Use this checklist before opening a pull request for Sprint 2 work:
+
+- Set `STORAGE_DRIVER=supabase`, `AI_PROVIDER=gemini`, `AI_MODEL=gemini-3.5-flash-lite`, and `GEMINI_API_KEY` in `coding/backend/.env`.
+- Run the backend and frontend with `.\run-dev.ps1`.
+- Register a new test account and log in.
+- Complete Profile, First Run, and Goal.
+- Confirm that Training Plan generation returns `source = gemini` in the backend response or dashboard plan source pill.
+- Submit today's quest as completed when actual distance reaches the target distance.
+- Test a second account or reset test data, then submit today's quest as failed with actual distance below target distance.
+- Confirm that one pending adjustment appears, the dashboard shows its preview, and `Accept Plan` updates the plan version.
+- Confirm that `Reject Plan` keeps the current plan and removes the pending adjustment from the dashboard.
+- In Supabase Table Editor, confirm rows exist in `profiles`, `runs`, `goals`, `training_plans`, `training_sessions`, `training_progress`, `ai_analysis`, and `plan_adjustments`.
+- Confirm there is only one pending adjustment per active training plan.
+
 ## Sprint 1 Scope
 
 - Users must log in before using main features.
@@ -220,6 +242,9 @@ The frontend starts from authentication, then redirects logged-in users to `dash
 - Completing a quest creates a quest-sourced Running Record and Training Progress.
 - Failed or expired quests can prepare a pending plan adjustment.
 - Pending adjustments are shown on the dashboard and require user acceptance before future sessions change.
+- Users can reject pending adjustments to keep the current plan.
+- The dashboard shows Daily Quest as an RPG-style quest board with rank, reward, timer, calendar detail, and plan adjustment preview.
+- Each active training plan can have only one pending adjustment at a time.
 
 ## Later Sprint Rules Preserved
 

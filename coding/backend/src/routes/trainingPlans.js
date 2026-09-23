@@ -19,6 +19,11 @@ function hasAdjustmentForSession(plan, session) {
 }
 
 async function createPendingAdjustment({ user, plan, failedSession, reason, triggerType = 'failed_quest' }) {
+  const existingPendingAdjustment = await store.findPendingAdjustmentForPlan(plan.training_plan_id);
+  if (existingPendingAdjustment) {
+    return existingPendingAdjustment;
+  }
+
   const goal = await store.findGoalById(plan.goal_id);
   const runs = await store.listRunsForUser(user.user_id);
   const today = toDateKey();
@@ -221,6 +226,35 @@ router.post('/training-plans/adjustments/:adjustmentId/accept', async (req, res,
 
     res.json({
       plan: await store.serializePlan(updatedPlan),
+      adjustment: updatedAdjustment,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/training-plans/adjustments/:adjustmentId/reject', async (req, res, next) => {
+  try {
+    const adjustment = await store.findAdjustmentById(req.params.adjustmentId);
+
+    if (!adjustment) {
+      throw new HttpError(404, 'ไม่พบแผนที่ AI ปรับให้');
+    }
+
+    const plan = await store.findPlanForUser(req.user.user_id, adjustment.training_plan_id);
+
+    if (!plan) {
+      throw new HttpError(404, 'ไม่พบตารางการฝึก');
+    }
+
+    assertCondition(adjustment.status === 'pending', 409, 'แผนนี้ถูกดำเนินการแล้ว');
+
+    const updatedAdjustment = await store.updateRecord('plan_adjustments', adjustment.plan_adjustment_id, {
+      status: 'rejected',
+    });
+
+    res.json({
+      plan: await store.serializePlan(plan),
       adjustment: updatedAdjustment,
     });
   } catch (err) {

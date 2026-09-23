@@ -165,6 +165,20 @@
             <span class="quest-status-pill" id="questStatusPill">Loading</span>
             <small id="questMeta">ตรวจสอบแผนฝึก...</small>
           </div>
+          <div class="quest-rpg-row" aria-label="Quest RPG summary">
+            <div>
+              <span>Rank</span>
+              <strong id="questRankLabel">Novice</strong>
+            </div>
+            <div>
+              <span>Reward</span>
+              <strong id="questRewardLabel">Plan EXP</strong>
+            </div>
+            <div>
+              <span>Time Limit</span>
+              <strong id="questTimerLabel">--:--</strong>
+            </div>
+          </div>
           <div class="quest-metrics" id="questMetrics"></div>
           <div class="quest-adjustment hidden" id="questAdjustment">
             <div>
@@ -172,7 +186,10 @@
               <strong id="questAdjustmentTitle">มีแผนปรับใหม่รออยู่</strong>
               <p id="questAdjustmentText">ระบบจะไม่ใช้แผนใหม่จนกว่าคุณจะกดยอมรับ</p>
             </div>
-            <button class="ghost-button quest-adjustment-button" id="acceptAdjustmentButton" type="button">Accept Plan</button>
+            <div class="quest-adjustment-actions">
+              <button class="ghost-button quest-adjustment-button reject-adjustment-button" id="rejectAdjustmentButton" type="button">Reject Plan</button>
+              <button class="ghost-button quest-adjustment-button" id="acceptAdjustmentButton" type="button">Accept Plan</button>
+            </div>
           </div>
           <form class="quest-submit-form hidden" id="questSubmitForm">
             <div class="two-column dashboard-columns">
@@ -185,11 +202,37 @@
                 <input id="questDurationInput" min="1" placeholder="minutes" required type="number">
               </label>
             </div>
+            <div class="quest-outcome-control" role="radiogroup" aria-label="Quest result">
+              <label>
+                <input checked name="questOutcome" type="radio" value="completed">
+                <span>ทำเควสสำเร็จ</span>
+              </label>
+              <label>
+                <input name="questOutcome" type="radio" value="failed">
+                <span>ทำเควสไม่สำเร็จ</span>
+              </label>
+            </div>
+            <label class="field hidden" id="questFailureReasonField">
+              <span>เหตุผลที่ทำเควสไม่สำเร็จ</span>
+              <textarea id="questFailureReasonInput" placeholder="เช่น เจ็บขา เวลาไม่พอ หรือวิ่งไม่ครบระยะ"></textarea>
+            </label>
             <p class="quest-rule-note">ระบบใช้ระยะทางเป็นเกณฑ์ผ่านเควส และส่งผลได้ครั้งเดียว</p>
             <button class="primary-button" type="submit">Submit Quest</button>
           </form>
           <button class="primary-button quest-generate-button hidden" id="generatePlanButton" type="button">Generate Training Plan</button>
         </div>
+      </section>
+
+      <section class="dashboard-panel plan-timeline-panel" id="planTimelinePanel" aria-labelledby="planTimelineTitle">
+        <div class="panel-heading timeline-heading">
+          <div>
+            <p class="eyebrow">Quest Timeline</p>
+            <h2 id="planTimelineTitle">แผนเควสจาก Training Plan</h2>
+            <p class="calendar-summary" id="planTimelineSummary">ยังไม่มี Training Plan</p>
+          </div>
+          <span class="plan-source-pill" id="planSourcePill">No Plan</span>
+        </div>
+        <div class="plan-timeline-list" id="planTimelineList"></div>
       </section>
 
       <section class="dashboard-main-grid" aria-label="Running foundation overview">
@@ -215,6 +258,7 @@
             <span><i class="legend-plan"></i> Plan Preview</span>
             <span><i class="legend-rest"></i> Rest</span>
           </div>
+          <div class="calendar-day-detail" id="calendarDayDetail" aria-live="polite"></div>
         </article>
 
         <aside class="dashboard-side-stack" aria-label="Recent activity and progress">
