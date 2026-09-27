@@ -1,6 +1,7 @@
 const express = require('express');
 const store = require('../storage');
 const { createPendingAdjustment } = require('./trainingPlans');
+const { completeActiveGoalIfReached } = require('../services/goalCompletion');
 const { toDateKey } = require('../utils/dates');
 const { assertCondition, HttpError } = require('../utils/httpError');
 
@@ -56,8 +57,14 @@ router.post('/training-sessions/:sessionId/submit', async (req, res, next) => {
     const completedSession = await store.updateRecord('training_sessions', session.training_session_id, {
       status: 'completed',
     });
+    const goalCompletion = await completeActiveGoalIfReached(req.user.user_id, run);
 
-    res.status(201).json({ session: completedSession, progress, run });
+    res.status(201).json({
+      session: completedSession,
+      progress,
+      run,
+      goal_completion: goalCompletion,
+    });
   } catch (err) {
     next(err);
   }

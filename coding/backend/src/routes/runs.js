@@ -1,5 +1,6 @@
 const express = require('express');
 const store = require('../storage');
+const { completeActiveGoalIfReached } = require('../services/goalCompletion');
 const { compareDateKey, toDateKey } = require('../utils/dates');
 const { assertCondition } = require('../utils/httpError');
 
@@ -53,8 +54,9 @@ router.post('/runs', async (req, res, next) => {
       run_type: req.body.run_type || 'Easy Run',
       source: req.body.source || 'manual',
     });
+    const goalCompletion = await completeActiveGoalIfReached(req.user.user_id, run);
 
-    res.status(201).json({ run });
+    res.status(201).json({ run, goal_completion: goalCompletion });
   } catch (err) {
     next(err);
   }

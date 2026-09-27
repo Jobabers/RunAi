@@ -2,6 +2,7 @@ const cors = require('cors');
 const express = require('express');
 const config = require('./config');
 const authRoutes = require('./routes/auth');
+const dashboardRoutes = require('./routes/dashboard');
 const profileRoutes = require('./routes/profile');
 const goalRoutes = require('./routes/goals');
 const { router: runRoutes } = require('./routes/runs');
@@ -23,6 +24,7 @@ app.get('/api/health', (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api', requireAuth, dashboardRoutes);
 app.use('/api', requireAuth, profileRoutes);
 app.use('/api', requireAuth, goalRoutes);
 app.use('/api', requireAuth, runRoutes);

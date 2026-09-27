@@ -179,6 +179,118 @@ create index if not exists idx_runs_user_date on runs (user_id, run_date desc);
 create index if not exists idx_training_sessions_plan_date on training_sessions (training_plan_id, session_date);
 create index if not exists idx_ai_analysis_user_plan on ai_analysis (user_id, training_plan_id);
 
+create or replace function get_runai_dashboard(
+  requested_user_id uuid,
+  recent_run_limit integer default 16
+)
+returns jsonb
+language sql
+security definer
+set search_path = public
+as $$
+with bounds as (
+  select
+    (current_date - (((extract(dow from current_date)::integer + 6) % 7))::integer)::date as week_start,
+    (current_date + (6 - ((extract(dow from current_date)::integer + 6) % 7))::integer)::date as week_end
+),
+active_plan as (
+  select *
+  from training_plans
+  where user_id = requested_user_id
+    and status = 'active'
+  order by training_plan_id desc
+  limit 1
+),
+fresh_sessions as (
+  select
+    ts.training_session_id,
+    ts.training_plan_id,
+    ts.session_date,
+    ts.training_type,
+    ts.target_distance,
+    ts.target_duration_minutes,
+    case
+      when progress.status is not null then progress.status::text
+      when ts.session_date < current_date then 'expired'
+      when ts.session_date > current_date then 'locked'
+      else 'available'
+    end as status,
+    ts.note,
+    ts.created_at,
+    ts.updated_at
+  from training_sessions ts
+  join active_plan ap on ap.training_plan_id = ts.training_plan_id
+  left join training_progress progress
+    on progress.training_session_id = ts.training_session_id
+),
+limited_runs as (
+  select *
+  from runs
+  where user_id = requested_user_id
+  order by run_date desc, run_id desc
+  limit greatest(coalesce(recent_run_limit, 16), 0)
+),
+run_summary as (
+  select jsonb_build_object(
+    'total_count', count(r.run_id),
+    'total_distance', coalesce(sum(r.distance), 0),
+    'total_duration_minutes', coalesce(sum(r.duration_minutes), 0),
+    'weekly_distance', coalesce(sum(r.distance) filter (
+      where r.run_date between bounds.week_start and bounds.week_end
+    ), 0),
+    'week_start', bounds.week_start,
+    'week_end', bounds.week_end
+  ) as payload
+  from bounds
+  left join runs r on r.user_id = requested_user_id
+  group by bounds.week_start, bounds.week_end
+)
+select jsonb_build_object(
+  'goals', coalesce((
+    select jsonb_agg(to_jsonb(g) order by g.goal_id desc)
+    from goals g
+    where g.user_id = requested_user_id
+  ), '[]'::jsonb),
+  'runs', coalesce((
+    select jsonb_agg(to_jsonb(r) order by r.run_date desc, r.run_id desc)
+    from limited_runs r
+  ), '[]'::jsonb),
+  'run_summary', (select payload from run_summary),
+  'active_plan', (
+    select to_jsonb(ap) || jsonb_build_object(
+      'sessions', coalesce((
+        select jsonb_agg(to_jsonb(s) order by s.session_date asc)
+        from fresh_sessions s
+      ), '[]'::jsonb),
+      'calendar', coalesce((
+        select jsonb_agg(jsonb_build_object(
+          'date', calendar_day::date,
+          'session', case
+            when s.training_session_id is null then null
+            else to_jsonb(s)
+          end,
+          'note', case
+            when s.training_session_id is null then 'วันนี้ไม่มีเควส'
+            else null
+          end
+        ) order by calendar_day)
+        from generate_series(ap.start_date, ap.end_date, interval '1 day') as calendar(calendar_day)
+        left join fresh_sessions s on s.session_date = calendar_day::date
+      ), '[]'::jsonb),
+      'pending_adjustment', (
+        select to_jsonb(pa)
+        from plan_adjustments pa
+        where pa.training_plan_id = ap.training_plan_id
+          and pa.status = 'pending'
+        order by pa.created_at desc
+        limit 1
+      )
+    )
+    from active_plan ap
+  )
+);
+$$;
+
 drop trigger if exists set_profiles_updated_at on profiles;
 create trigger set_profiles_updated_at
   before update on profiles
