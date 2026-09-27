@@ -20,7 +20,12 @@ el('logoutButton').addEventListener('click', logout);
 el('runForm').addEventListener('submit', async (event) => {
   event.preventDefault(); show('');
   const payload = { run_date: el('runDateInput').value, distance: Number(el('runDistanceInput').value), duration_minutes: Number(el('runDurationInput').value), run_type: el('runTypeInput').value };
-  try { await api('/runs', { method: 'POST', body: JSON.stringify(payload) }); el('runForm').reset(); el('runDateInput').value = today(); show('บันทึก Running Record แล้ว'); }
+  try {
+    const result = await api('/runs', { method: 'POST', body: JSON.stringify(payload) });
+    el('runForm').reset();
+    el('runDateInput').value = today();
+    show(result.goal_completion?.goal ? 'บันทึก Running Record แล้ว และคุณทำเป้าหมายสำเร็จแล้ว' : 'บันทึก Running Record แล้ว');
+  }
   catch (error) { show(error.message, 'error'); }
 });
 if (!token) logout(); else { el('runDateInput').value = today(); el('runDateInput').max = today(); load(); }

@@ -47,8 +47,6 @@ const elements = {
   recentRunsList: document.getElementById('recentRunsList'),
   progressChartBars: document.getElementById('progressChartBars'),
   progressChartMeta: document.getElementById('progressChartMeta'),
-  historyList: document.getElementById('historyList'),
-  goalLockedNote: document.getElementById('goalLockedNote'),
   calendarTitle: document.getElementById('calendarTitle'),
   calendarSummary: document.getElementById('calendarSummary'),
   trainingCalendar: document.getElementById('trainingCalendar'),
@@ -56,21 +54,9 @@ const elements = {
   calendarPrevButton: document.getElementById('calendarPrevButton'),
   calendarTodayButton: document.getElementById('calendarTodayButton'),
   calendarNextButton: document.getElementById('calendarNextButton'),
-  profileForm: document.getElementById('profileForm'),
-  goalForm: document.getElementById('goalForm'),
-  runForm: document.getElementById('runForm'),
 };
 
 const inputs = {
-  profileName: document.getElementById('profileNameInput'),
-  profileAge: document.getElementById('profileAgeInput'),
-  profileWeight: document.getElementById('profileWeightInput'),
-  profileHeight: document.getElementById('profileHeightInput'),
-  profileExperience: document.getElementById('profileExperienceInput'),
-  goalType: document.getElementById('goalTypeInput'),
-  goalDistance: document.getElementById('goalDistanceInput'),
-  goalDuration: document.getElementById('goalDurationInput'),
-  goalDate: document.getElementById('goalDateInput'),
   firstRunDistance: document.getElementById('firstRunDistanceInput'),
   firstRunDuration: document.getElementById('firstRunDurationInput'),
   profileGateName: document.getElementById('profileGateNameInput'),
@@ -82,10 +68,6 @@ const inputs = {
   goalGateDistance: document.getElementById('goalGateDistanceInput'),
   goalGateDuration: document.getElementById('goalGateDurationInput'),
   goalGateDate: document.getElementById('goalGateDateInput'),
-  runDate: document.getElementById('runDateInput'),
-  runDistance: document.getElementById('runDistanceInput'),
-  runDuration: document.getElementById('runDurationInput'),
-  runType: document.getElementById('runTypeInput'),
   questDistance: document.getElementById('questDistanceInput'),
   questDuration: document.getElementById('questDurationInput'),
   questFailureReason: document.getElementById('questFailureReasonInput'),
@@ -95,6 +77,7 @@ let dashboardState = {
   user: null,
   goals: [],
   runs: [],
+  runSummary: null,
   activePlan: null,
 };
 
@@ -285,13 +268,31 @@ function getPlanProgress(plan) {
   };
 }
 
-function getGoalProgressPercent(goal, runs, plan = null) {
+function getRunSummary() {
+  const fallbackWeek = getWeekRange();
+  return dashboardState.runSummary || {
+    total_count: dashboardState.runs.length,
+    total_distance: dashboardState.runs.reduce((sum, run) => sum + Number(run.distance || 0), 0),
+    total_duration_minutes: dashboardState.runs.reduce((sum, run) => sum + Number(run.duration_minutes || 0), 0),
+    weekly_distance: dashboardState.runs
+      .filter((run) => run.run_date >= fallbackWeek.start && run.run_date <= fallbackWeek.end)
+      .reduce((sum, run) => sum + Number(run.distance || 0), 0),
+    week_start: fallbackWeek.start,
+    week_end: fallbackWeek.end,
+  };
+}
+
+function getRunCount() {
+  return Number(getRunSummary().total_count || 0);
+}
+
+function getGoalProgressPercent(goal, runs, plan = null, summary = null) {
   const planProgress = getPlanProgress(plan);
   if (planProgress.total) {
     return planProgress.percent;
   }
 
-  const totalDistance = runs.reduce((sum, run) => sum + Number(run.distance || 0), 0);
+  const totalDistance = Number(summary?.total_distance ?? runs.reduce((sum, run) => sum + Number(run.distance || 0), 0));
   const targetDistance = Number(goal?.target_distance || 0);
 
   if (!targetDistance) return 0;
@@ -325,11 +326,6 @@ function renderUser(user) {
   inputs.profileGateWeight.value = user.weight || '';
   inputs.profileGateHeight.value = user.height || '';
   inputs.profileGateExperience.value = user.experience_level || 'beginner';
-  inputs.profileName.value = user.name || '';
-  inputs.profileAge.value = user.age || '';
-  inputs.profileWeight.value = user.weight || '';
-  inputs.profileHeight.value = user.height || '';
-  inputs.profileExperience.value = user.experience_level || 'beginner';
   localStorage.setItem('runai_user', JSON.stringify(user));
 }
 
@@ -338,17 +334,16 @@ function renderStats() {
   const activeGoal = getActiveGoal(goals);
   const todayQuest = getTodayQuest();
   const planProgress = getPlanProgress(dashboardState.activePlan);
-  const totalDistance = runs.reduce((sum, run) => sum + Number(run.distance || 0), 0);
-  const totalDuration = runs.reduce((sum, run) => sum + Number(run.duration_minutes || 0), 0);
-  const goalPercent = getGoalProgressPercent(activeGoal, runs, dashboardState.activePlan);
-  const week = getWeekRange();
-  const weeklyDistance = runs
-    .filter((run) => run.run_date >= week.start && run.run_date <= week.end)
-    .reduce((sum, run) => sum + Number(run.distance || 0), 0);
+  const runSummary = getRunSummary();
+  const runCount = Number(runSummary.total_count || 0);
+  const totalDistance = Number(runSummary.total_distance || 0);
+  const totalDuration = Number(runSummary.total_duration_minutes || 0);
+  const weeklyDistance = Number(runSummary.weekly_distance || 0);
+  const goalPercent = getGoalProgressPercent(activeGoal, runs, dashboardState.activePlan, runSummary);
 
-  elements.totalRunsStat.textContent = String(runs.length);
+  elements.totalRunsStat.textContent = String(runCount);
   elements.weeklyDistanceStat.textContent = formatDistance(weeklyDistance);
-  elements.weeklyDistanceMeta.textContent = `${formatDate(week.start)} - ${formatDate(week.end)}`;
+  elements.weeklyDistanceMeta.textContent = `${formatDate(runSummary.week_start)} - ${formatDate(runSummary.week_end)}`;
 
   if (activeGoal) {
     elements.activeGoalStat.textContent = formatDistance(activeGoal.target_distance);
@@ -363,14 +358,14 @@ function renderStats() {
 
   elements.averagePaceStat.textContent = totalDistance ? formatPace(totalDistance, totalDuration).replace(' /km', '') : '-';
   elements.latestRunMeta.textContent = totalDistance ? 'นาทีต่อกิโลเมตร' : 'ยังไม่มีประวัติวิ่ง';
-  elements.foundationActionStat.textContent = runs.length ? 'Add Record' : 'First Record';
-  elements.foundationActionMeta.textContent = runs.length
-    ? `มี Running Record ${runs.length} รายการสำหรับดูพัฒนาการ`
+  elements.foundationActionStat.textContent = runCount ? 'Add Record' : 'First Record';
+  elements.foundationActionMeta.textContent = runCount
+    ? `มี Running Record ${runCount} รายการสำหรับดูพัฒนาการ`
     : 'บันทึกการวิ่งครั้งแรกเพื่อเริ่มดูพัฒนาการ';
 
   if (!isProfileComplete(user)) {
     elements.nextActionText.textContent = 'เริ่มจากกรอกข้อมูลพื้นฐานให้ครบก่อน';
-  } else if (!runs.length) {
+  } else if (!runCount) {
     elements.nextActionText.textContent = 'กรอกระยะทางและเวลาการวิ่งครั้งแรกก่อนเริ่มใช้งาน';
   } else if (!activeGoal) {
     elements.nextActionText.textContent = 'ต่อไปสร้างเป้าหมายการวิ่งของคุณ';
@@ -385,16 +380,6 @@ function renderStats() {
   } else {
     elements.nextActionText.textContent = 'RunAI พร้อมสร้างแผนฝึกของคุณ';
   }
-}
-
-function renderGoalFormState() {
-  const activeGoal = getActiveGoal(dashboardState.goals);
-  const isLocked = Boolean(activeGoal);
-
-  elements.goalLockedNote.classList.toggle('hidden', !isLocked);
-  elements.goalForm.querySelectorAll('input, select, button').forEach((control) => {
-    control.disabled = isLocked;
-  });
 }
 
 function setQuestPanelState({
@@ -653,15 +638,6 @@ function renderPlanTimeline() {
   elements.planTimelineList.innerHTML = `${adjustmentPreview}${sessionItems || '<p class="empty-state compact-empty-state">ไม่มีเควสในช่วงนี้</p>'}`;
 }
 
-function renderHistory() {
-  if (!dashboardState.runs.length) {
-    elements.historyList.innerHTML = '<tr><td colspan="5" class="table-empty">ยังไม่มีประวัติการวิ่ง</td></tr>';
-    return;
-  }
-
-  elements.historyList.innerHTML = dashboardState.runs.map((run) => `<tr><td>${formatDate(run.run_date)}</td><td>${run.run_type || 'Easy Run'}</td><td>${formatDistance(run.distance)}</td><td>${Number(run.duration_minutes)} min</td><td>${formatPace(run.distance, run.duration_minutes)}</td></tr>`).join('');
-}
-
 function renderRecentRuns() {
   if (!dashboardState.runs.length) {
     elements.recentRunsList.innerHTML = '<p class="empty-state compact-empty-state">ยังไม่มีประวัติการวิ่ง</p>';
@@ -894,7 +870,7 @@ function renderCalendar() {
 
 function renderGateFlow() {
   const hasProfile = isProfileComplete(dashboardState.user);
-  const hasFirstRun = dashboardState.runs.length > 0;
+  const hasFirstRun = getRunCount() > 0;
   const hasGoal = Boolean(getActiveGoal(dashboardState.goals));
 
   const needsProfile = !hasProfile;
@@ -912,10 +888,8 @@ function renderDashboard() {
   renderUser(dashboardState.user);
   renderGateFlow();
   renderStats();
-  renderGoalFormState();
   renderQuestPanel();
   renderPlanTimeline();
-  renderHistory();
   renderRecentRuns();
   renderProgressChart();
   renderCalendar();
@@ -924,18 +898,14 @@ function renderDashboard() {
 async function loadDashboard() {
   showDashboardMessage('');
   try {
-    const [meData, goalsData, runsData, planData] = await Promise.all([
-      apiFetch('/me'),
-      apiFetch('/goals'),
-      apiFetch('/runs'),
-      apiFetch('/training-plans/active'),
-    ]);
+    const dashboardData = await apiFetch('/dashboard');
 
     dashboardState = {
-      user: meData.user,
-      goals: goalsData.goals || [],
-      runs: runsData.runs || [],
-      activePlan: planData.plan || null,
+      user: dashboardData.user,
+      goals: dashboardData.goals || [],
+      runs: dashboardData.runs || [],
+      runSummary: dashboardData.run_summary || null,
+      activePlan: dashboardData.active_plan || null,
     };
 
     renderDashboard();
@@ -1011,19 +981,6 @@ async function handleProfileGateSubmit(event) {
   }), 'บันทึก Profile แล้ว ต่อไปกรอกข้อมูล First Run');
 }
 
-async function handleProfileSubmit(event) {
-  event.preventDefault();
-  showDashboardMessage('');
-
-  await saveProfile(buildProfilePayload({
-    name: inputs.profileName,
-    age: inputs.profileAge,
-    weight: inputs.profileWeight,
-    height: inputs.profileHeight,
-    experience: inputs.profileExperience,
-  }), 'บันทึกข้อมูลพื้นฐานแล้ว');
-}
-
 function buildGoalPayload(sourceInputs) {
   const payload = {
     goal_type: sourceInputs.type.value,
@@ -1062,9 +1019,7 @@ async function saveGoal(payload, successMessage) {
     });
     await generateTrainingPlan(goalData.goal.goal_id);
     elements.goalGateForm.reset();
-    elements.goalForm.reset();
     inputs.goalGateDate.value = getDefaultGoalDate();
-    inputs.goalDate.value = getDefaultGoalDate();
     await loadDashboard();
     showDashboardMessage(`${successMessage} และสร้าง Training Plan แล้ว`);
   } catch (error) {
@@ -1082,43 +1037,6 @@ async function handleGoalGateSubmit(event) {
     duration: inputs.goalGateDuration,
     date: inputs.goalGateDate,
   }), 'บันทึก Goal แล้ว Dashboard พร้อมใช้งาน');
-}
-
-async function handleGoalSubmit(event) {
-  event.preventDefault();
-  showDashboardMessage('');
-
-  await saveGoal(buildGoalPayload({
-    type: inputs.goalType,
-    distance: inputs.goalDistance,
-    duration: inputs.goalDuration,
-    date: inputs.goalDate,
-  }), 'บันทึก Goal แล้ว');
-}
-
-async function handleRunSubmit(event) {
-  event.preventDefault();
-  showDashboardMessage('');
-
-  const payload = {
-    run_date: inputs.runDate.value,
-    distance: Number(inputs.runDistance.value),
-    duration_minutes: Number(inputs.runDuration.value),
-    run_type: inputs.runType.value,
-  };
-
-  try {
-    await apiFetch('/runs', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-    elements.runForm.reset();
-    inputs.runDate.value = getTodayKey();
-    showDashboardMessage('บันทึก Running Record แล้ว');
-    await loadDashboard();
-  } catch (error) {
-    showDashboardMessage(error.message, 'error');
-  }
 }
 
 async function handleGeneratePlanClick() {
@@ -1182,14 +1100,19 @@ async function handleQuestSubmit(event) {
   elements.questSubmitForm.querySelector('button[type="submit"]').disabled = true;
 
   try {
-    await apiFetch(endpoint, {
+    const result = await apiFetch(endpoint, {
       method: 'POST',
       body: JSON.stringify(payload),
     });
     elements.questSubmitForm.reset();
     updateQuestOutcomeFields();
     await loadDashboard();
-    showDashboardMessage(isCompleted ? 'ส่งเควสสำเร็จแล้ว' : 'บันทึกเควสไม่สำเร็จแล้ว', isCompleted ? 'success' : 'error');
+    const completedGoal = result.goal_completion?.goal;
+    if (completedGoal) {
+      showDashboardMessage('ส่งเควสสำเร็จแล้ว และคุณทำเป้าหมายสำเร็จแล้ว');
+    } else {
+      showDashboardMessage(isCompleted ? 'ส่งเควสสำเร็จแล้ว' : 'บันทึกเควสไม่สำเร็จแล้ว', isCompleted ? 'success' : 'error');
+    }
   } catch (error) {
     showDashboardMessage(error.message, 'error');
   } finally {
@@ -1261,9 +1184,6 @@ function bindEvents() {
   elements.profileGateForm.addEventListener('submit', handleProfileGateSubmit);
   elements.firstRunForm.addEventListener('submit', handleFirstRunSubmit);
   elements.goalGateForm.addEventListener('submit', handleGoalGateSubmit);
-  elements.profileForm.addEventListener('submit', handleProfileSubmit);
-  elements.goalForm.addEventListener('submit', handleGoalSubmit);
-  elements.runForm.addEventListener('submit', handleRunSubmit);
   elements.generatePlanButton.addEventListener('click', handleGeneratePlanClick);
   elements.acceptAdjustmentButton.addEventListener('click', handleAcceptAdjustmentClick);
   elements.rejectAdjustmentButton.addEventListener('click', handleRejectAdjustmentClick);
@@ -1292,8 +1212,7 @@ function bindEvents() {
     renderCalendar();
   });
   elements.quickRecordButton.addEventListener('click', () => {
-    document.getElementById('runPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    inputs.runDistance.focus({ preventScroll: true });
+    window.location.href = 'run.html';
   });
 }
 
@@ -1312,13 +1231,9 @@ function bootDashboard() {
     return;
   }
 
-  inputs.runDate.value = getTodayKey();
-  inputs.runDate.max = getTodayKey();
   selectedCalendarDate = getTodayKey();
   inputs.goalGateDate.value = getDefaultGoalDate();
   inputs.goalGateDate.min = getTodayKey();
-  inputs.goalDate.value = getDefaultGoalDate();
-  inputs.goalDate.min = getTodayKey();
   updateQuestOutcomeFields();
   bindEvents();
   startQuestTimer();

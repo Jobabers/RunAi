@@ -71,6 +71,7 @@ async function createPendingAdjustment({ user, plan, failedSession, reason, trig
 }
 
 async function ensureExpiredAdjustments(user, plan) {
+  await store.refreshPlanState(plan);
   const sessions = await store.getPlanSessions(plan.training_plan_id);
   let expiredSession = null;
 
@@ -92,14 +93,21 @@ async function ensureExpiredAdjustments(user, plan) {
   });
 }
 
+function queueExpiredAdjustmentCheck(user, plan) {
+  ensureExpiredAdjustments(user, plan).catch((error) => {
+    console.error('Failed to prepare expired quest adjustment:', error);
+  });
+}
+
 router.get('/training-plans/active', async (req, res, next) => {
   try {
-    const plan = await store.findActivePlan(req.user.user_id);
-    if (plan) {
-      await ensureExpiredAdjustments(req.user, plan);
-    }
+    const plan = await store.findActivePlan(req.user.user_id, { refresh: false });
+    const serializedPlan = plan ? await store.serializePlan(plan, { refresh: false }) : null;
 
-    res.json({ plan: plan ? await store.serializePlan(plan) : null });
+    res.json({ plan: serializedPlan });
+    if (plan) {
+      queueExpiredAdjustmentCheck(req.user, plan);
+    }
   } catch (err) {
     next(err);
   }
@@ -264,5 +272,6 @@ router.post('/training-plans/adjustments/:adjustmentId/reject', async (req, res,
 
 module.exports = {
   createPendingAdjustment,
+  queueExpiredAdjustmentCheck,
   router,
 };

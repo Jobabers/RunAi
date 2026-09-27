@@ -92,7 +92,42 @@ function findActiveGoal(userId, goalId = null) {
 function listRunsForUser(userId) {
   return db.runs
     .filter((run) => sameUserId(run.user_id, userId))
-    .sort((a, b) => b.run_date.localeCompare(a.run_date));
+    .sort((a, b) => (
+      b.run_date.localeCompare(a.run_date)
+      || Number(b.run_id || 0) - Number(a.run_id || 0)
+    ));
+}
+
+function getWeekRange() {
+  const today = new Date();
+  const dayIndex = (today.getDay() + 6) % 7;
+  const start = new Date(today);
+  start.setDate(today.getDate() - dayIndex);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+
+  return {
+    start: toDateKey(start),
+    end: toDateKey(end),
+  };
+}
+
+function summarizeRuns(runs) {
+  const week = getWeekRange();
+  const totalDistance = runs.reduce((sum, run) => sum + Number(run.distance || 0), 0);
+  const totalDuration = runs.reduce((sum, run) => sum + Number(run.duration_minutes || 0), 0);
+  const weeklyDistance = runs
+    .filter((run) => run.run_date >= week.start && run.run_date <= week.end)
+    .reduce((sum, run) => sum + Number(run.distance || 0), 0);
+
+  return {
+    total_count: runs.length,
+    total_distance: totalDistance,
+    total_duration_minutes: totalDuration,
+    weekly_distance: weeklyDistance,
+    week_start: week.start,
+    week_end: week.end,
+  };
 }
 
 function findActivePlan(userId) {
@@ -245,15 +280,33 @@ function refreshPlanState(plan) {
     session.status = 'available';
     touch(session);
   }
+
+  return sessions;
 }
 
-function serializePlan(plan) {
-  refreshPlanState(plan);
+function serializePlan(plan, options = {}) {
+  const sessions = options.refresh === false
+    ? getPlanSessions(plan.training_plan_id)
+    : refreshPlanState(plan);
   return {
     ...plan,
-    sessions: getPlanSessions(plan.training_plan_id),
+    sessions,
     calendar: getPlanCalendar(plan),
     pending_adjustment: findPendingAdjustmentForPlan(plan.training_plan_id),
+  };
+}
+
+function getDashboardData(user, options = {}) {
+  const recentRunLimit = Number(options.recentRunLimit || 16);
+  const runs = listRunsForUser(user.user_id);
+  const activePlan = findActivePlan(user.user_id);
+
+  return {
+    user: publicUser(user),
+    goals: listGoalsForUser(user.user_id),
+    runs: runs.slice(0, recentRunLimit),
+    run_summary: summarizeRuns(runs),
+    active_plan: activePlan ? serializePlan(activePlan, { refresh: false }) : null,
   };
 }
 
@@ -281,6 +334,7 @@ module.exports = {
   findSessionForUser,
   findUserByEmail,
   findUserById,
+  getDashboardData,
   getPlanSessions,
   hasAnalysisForFailedSession,
   listGoalsForUser,

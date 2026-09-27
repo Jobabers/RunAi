@@ -33,6 +33,11 @@ function addFilter(params, column, operator, value) {
   params.set(column, `${operator}.${value}`);
 }
 
+function isMissingRpcError(error) {
+  return error?.details?.code === 'PGRST202'
+    || /function.*get_runai_dashboard|Could not find.*get_runai_dashboard/i.test(error?.message || '');
+}
+
 async function supabaseFetch(table, { method = 'GET', params = null, body = null, prefer = '' } = {}) {
   requireSupabaseConfig();
 
@@ -167,8 +172,11 @@ function findActiveGoal(userId, goalId = null) {
   return selectOne('goals', filters, { order: 'goal_id.desc' });
 }
 
-function listRunsForUser(userId) {
-  return selectRows('runs', [['user_id', 'eq', userId]], { order: 'run_date.desc' });
+function listRunsForUser(userId, options = {}) {
+  return selectRows('runs', [['user_id', 'eq', userId]], {
+    order: 'run_date.desc,run_id.desc',
+    limit: options.limit || null,
+  });
 }
 
 function findPlanById(planId) {
@@ -192,18 +200,37 @@ async function findProgressBySessionId(sessionId) {
   return selectOne('training_progress', [['training_session_id', 'eq', sessionId]]);
 }
 
-async function refreshPlanState(plan) {
+async function listProgressForSessionIds(sessionIds) {
+  const ids = [...new Set(sessionIds.map(Number).filter(Number.isFinite))];
+  if (!ids.length) return [];
+
+  return selectRows('training_progress', [
+    ['training_session_id', 'in', `(${ids.join(',')})`],
+  ]);
+}
+
+async function refreshPlanState(plan, preloadedSessions = null) {
   const today = toDateKey();
-  const sessions = await getPlanSessions(plan.training_plan_id);
+  const sessions = preloadedSessions || await getPlanSessions(plan.training_plan_id);
+  const progressRows = await listProgressForSessionIds(
+    sessions.map((session) => session.training_session_id),
+  );
+  const progressBySessionId = new Map(
+    progressRows.map((progress) => [Number(progress.training_session_id), progress]),
+  );
+  const refreshedSessions = [];
 
   for (const session of sessions) {
-    const progress = await findProgressBySessionId(session.training_session_id);
+    const progress = progressBySessionId.get(Number(session.training_session_id));
 
     if (progress) {
       if (session.status !== progress.status) {
-        await updateRecord('training_sessions', session.training_session_id, {
+        const updatedSession = await updateRecord('training_sessions', session.training_session_id, {
           status: progress.status,
         });
+        refreshedSessions.push(updatedSession || { ...session, status: progress.status });
+      } else {
+        refreshedSessions.push(session);
       }
       continue;
     }
@@ -219,36 +246,130 @@ async function refreshPlanState(plan) {
         submitted_at: new Date(`${session.session_date}T23:59:00`).toISOString(),
         strava_image_url: null,
       });
-      await updateRecord('training_sessions', session.training_session_id, {
+      const updatedSession = await updateRecord('training_sessions', session.training_session_id, {
         status: 'expired',
       });
+      refreshedSessions.push(updatedSession || { ...session, status: 'expired' });
       continue;
     }
 
     const nextStatus = compareDateKey(session.session_date, today) > 0 ? 'locked' : 'available';
     if (session.status !== nextStatus) {
-      await updateRecord('training_sessions', session.training_session_id, {
+      const updatedSession = await updateRecord('training_sessions', session.training_session_id, {
         status: nextStatus,
       });
+      refreshedSessions.push(updatedSession || { ...session, status: nextStatus });
+      continue;
     }
+
+    refreshedSessions.push(session);
   }
+
+  return refreshedSessions;
 }
 
-async function findActivePlan(userId) {
+async function findActivePlan(userId, options = {}) {
   const plan = await selectOne('training_plans', [
     ['user_id', 'eq', userId],
     ['status', 'eq', 'active'],
   ]);
 
-  if (plan) {
+  if (plan && options.refresh !== false) {
     await refreshPlanState(plan);
   }
 
   return plan;
 }
 
-async function getPlanCalendar(plan) {
-  const sessions = await getPlanSessions(plan.training_plan_id);
+function getWeekRange() {
+  const today = new Date();
+  const dayIndex = (today.getDay() + 6) % 7;
+  const start = new Date(today);
+  start.setDate(today.getDate() - dayIndex);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+
+  return {
+    start: toDateKey(start),
+    end: toDateKey(end),
+  };
+}
+
+function summarizeRuns(runs) {
+  const week = getWeekRange();
+  const totalDistance = runs.reduce((sum, run) => sum + Number(run.distance || 0), 0);
+  const totalDuration = runs.reduce((sum, run) => sum + Number(run.duration_minutes || 0), 0);
+  const weeklyDistance = runs
+    .filter((run) => run.run_date >= week.start && run.run_date <= week.end)
+    .reduce((sum, run) => sum + Number(run.distance || 0), 0);
+
+  return {
+    total_count: runs.length,
+    total_distance: totalDistance,
+    total_duration_minutes: totalDuration,
+    weekly_distance: weeklyDistance,
+    week_start: week.start,
+    week_end: week.end,
+  };
+}
+
+function normalizeDashboardPayload(user, payload) {
+  const data = Array.isArray(payload) ? payload[0] : payload;
+  const week = getWeekRange();
+
+  return {
+    user: publicUser(user),
+    goals: data?.goals || [],
+    runs: data?.runs || [],
+    run_summary: data?.run_summary || {
+      total_count: 0,
+      total_distance: 0,
+      total_duration_minutes: 0,
+      weekly_distance: 0,
+      week_start: week.start,
+      week_end: week.end,
+    },
+    active_plan: data?.active_plan || null,
+  };
+}
+
+async function getDashboardDataFallback(user, options = {}) {
+  const recentRunLimit = Number(options.recentRunLimit || 16);
+  const allRuns = await listRunsForUser(user.user_id);
+  const activePlan = await findActivePlan(user.user_id, { refresh: false });
+
+  return {
+    user: publicUser(user),
+    goals: await listGoalsForUser(user.user_id),
+    runs: allRuns.slice(0, recentRunLimit),
+    run_summary: summarizeRuns(allRuns),
+    active_plan: activePlan ? await serializePlan(activePlan, { refresh: false }) : null,
+  };
+}
+
+async function getDashboardData(user, options = {}) {
+  const recentRunLimit = Number(options.recentRunLimit || 16);
+
+  try {
+    const payload = await supabaseFetch('rpc/get_runai_dashboard', {
+      method: 'POST',
+      body: {
+        requested_user_id: user.user_id,
+        recent_run_limit: recentRunLimit,
+      },
+    });
+
+    return normalizeDashboardPayload(user, payload);
+  } catch (error) {
+    if (!isMissingRpcError(error)) {
+      throw error;
+    }
+
+    return getDashboardDataFallback(user, options);
+  }
+}
+
+function buildPlanCalendar(plan, sessions) {
   const byDate = new Map(sessions.map((session) => [session.session_date, session]));
 
   return eachDate(plan.start_date, plan.end_date).map((date) => ({
@@ -258,16 +379,20 @@ async function getPlanCalendar(plan) {
   }));
 }
 
-async function serializePlan(plan) {
-  await refreshPlanState(plan);
+async function getPlanCalendar(plan) {
+  return buildPlanCalendar(plan, await getPlanSessions(plan.training_plan_id));
+}
 
-  const sessions = await getPlanSessions(plan.training_plan_id);
+async function serializePlan(plan, options = {}) {
+  const sessions = options.refresh === false
+    ? await getPlanSessions(plan.training_plan_id)
+    : await refreshPlanState(plan);
   const pendingAdjustment = await findPendingAdjustmentForPlan(plan.training_plan_id);
 
   return {
     ...plan,
     sessions,
-    calendar: await getPlanCalendar(plan),
+    calendar: buildPlanCalendar(plan, sessions),
     pending_adjustment: pendingAdjustment,
   };
 }
@@ -321,6 +446,7 @@ module.exports = {
   findSessionForUser,
   findUserByEmail,
   findUserById,
+  getDashboardData,
   getPlanSessions,
   hasAnalysisForFailedSession,
   listGoalsForUser,

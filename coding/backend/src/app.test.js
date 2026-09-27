@@ -143,6 +143,17 @@ test('supports the first RunAI quest workflow', async (t) => {
   assert.equal(plan.response.status, 201);
   assert.equal(plan.data.plan.sessions[0].status, 'available');
 
+  const dashboard = await request(baseUrl, '/dashboard', {
+    token,
+  });
+  assert.equal(dashboard.response.status, 200);
+  assert.equal(dashboard.data.user.email, 'runner-one@example.com');
+  assert.equal(dashboard.data.goals.length, 1);
+  assert.equal(dashboard.data.run_summary.total_count, 1);
+  assert.ok(dashboard.data.runs.length <= 16);
+  assert.equal(dashboard.data.active_plan.training_plan_id, plan.data.plan.training_plan_id);
+  assert.ok(dashboard.data.active_plan.sessions.length > 0);
+
   const session = plan.data.plan.sessions[0];
   const notPassed = await request(baseUrl, `/training-sessions/${session.training_session_id}/submit`, {
     method: 'POST',
@@ -307,6 +318,112 @@ test('completes a daily quest once and rejects a forced fail after reaching targ
     },
   });
   assert.equal(duplicateComplete.response.status, 409);
+});
+
+test('auto-completes the active goal and plan when a quest reaches the goal distance early', async (t) => {
+  store.resetForTests();
+  authProvider.resetForTests();
+  const server = await listen(app);
+  t.after(() => server.close());
+
+  const { port } = server.address();
+  const baseUrl = `http://127.0.0.1:${port}/api`;
+
+  await request(baseUrl, '/auth/register', {
+    method: 'POST',
+    body: {
+      email: 'early-goal-finisher@example.com',
+      password: 'password123',
+    },
+  });
+
+  const login = await request(baseUrl, '/auth/login', {
+    method: 'POST',
+    body: {
+      email: 'early-goal-finisher@example.com',
+      password: 'password123',
+    },
+  });
+  const { token } = login.data;
+
+  await request(baseUrl, '/me', {
+    method: 'PUT',
+    token,
+    body: {
+      name: 'Early Goal Finisher',
+      age: 23,
+      weight: 66,
+      height: 174,
+      experience_level: 'intermediate',
+    },
+  });
+
+  await request(baseUrl, '/runs', {
+    method: 'POST',
+    token,
+    body: {
+      run_date: toDateKey(),
+      distance: 5,
+      duration_minutes: 32,
+      run_type: 'Easy Run',
+    },
+  });
+
+  const goal = await request(baseUrl, '/goals', {
+    method: 'POST',
+    token,
+    body: {
+      goal_type: 'distance',
+      target_distance: 10,
+      target_duration_minutes: 50,
+      target_date: addDays(toDateKey(), 30),
+    },
+  });
+  assert.equal(goal.response.status, 201);
+
+  const plan = await request(baseUrl, '/training-plans/generate', {
+    method: 'POST',
+    token,
+    body: { goal_id: goal.data.goal.goal_id },
+  });
+  assert.equal(plan.response.status, 201);
+
+  const session = plan.data.plan.sessions[0];
+  const completed = await request(baseUrl, `/training-sessions/${session.training_session_id}/submit`, {
+    method: 'POST',
+    token,
+    body: {
+      actual_distance: 10,
+      actual_duration_minutes: 50,
+    },
+  });
+
+  assert.equal(completed.response.status, 201);
+  assert.equal(completed.data.goal_completion.goal.status, 'completed');
+  assert.equal(completed.data.goal_completion.active_plan.status, 'completed');
+
+  const activePlan = await request(baseUrl, '/training-plans/active', {
+    token,
+  });
+  assert.equal(activePlan.response.status, 200);
+  assert.equal(activePlan.data.plan, null);
+
+  const goals = await request(baseUrl, '/goals', {
+    token,
+  });
+  assert.equal(goals.data.goals[0].status, 'completed');
+
+  const nextGoal = await request(baseUrl, '/goals', {
+    method: 'POST',
+    token,
+    body: {
+      goal_type: 'distance',
+      target_distance: 15,
+      target_duration_minutes: 80,
+      target_date: addDays(toDateKey(), 45),
+    },
+  });
+  assert.equal(nextGoal.response.status, 201);
 });
 
 test('rejects a pending AI plan adjustment without changing the active plan version', async (t) => {
