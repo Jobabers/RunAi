@@ -13,7 +13,17 @@ const { errorHandler, notFound } = require('./middleware/errors');
 
 const app = express();
 
-app.use(cors({ origin: config.frontendOrigin, credentials: true }));
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || config.frontendOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+}));
 app.use(express.json({ limit: '1mb' }));
 
 app.get('/api/health', (req, res) => {

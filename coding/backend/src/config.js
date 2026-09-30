@@ -9,10 +9,15 @@ function normalizeSupabaseProjectUrl(rawUrl = '') {
 }
 
 const supabaseProjectUrl = normalizeSupabaseProjectUrl(process.env.SUPABASE_URL || '');
+const frontendOrigins = String(process.env.FRONTEND_ORIGIN || 'http://localhost:3000')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 const config = {
   port: Number(process.env.PORT || 4000),
-  frontendOrigin: process.env.FRONTEND_ORIGIN || 'http://localhost:3000',
+  frontendOrigin: frontendOrigins[0] || 'http://localhost:3000',
+  frontendOrigins,
   storageDriver: process.env.STORAGE_DRIVER || 'memory',
   supabase: {
     url: supabaseProjectUrl,

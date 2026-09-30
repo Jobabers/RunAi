@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:4000/api';
+const API_BASE = window.RUNAI_CONFIG?.apiBase || 'http://localhost:4000/api';
 
 const authForm = document.getElementById('authForm');
 const messageBox = document.getElementById('messageBox');
