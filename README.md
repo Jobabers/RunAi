@@ -150,6 +150,41 @@ Default URLs:
 - Frontend: `http://localhost:3000`
 - Backend API: `http://localhost:4000/api`
 
+## Deployment Checklist
+
+1. Merge the branch you want to deploy.
+2. Run `coding/backend/database/schema.sql` in Supabase SQL Editor so the tables, indexes, and `get_runai_dashboard` RPC are up to date.
+3. Deploy `coding/backend` as a Node.js service.
+   - Build command: `npm install`
+   - Start command: `npm start`
+   - Root directory: `coding/backend`
+4. Add backend environment variables:
+
+```env
+STORAGE_DRIVER=supabase
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+JWT_SECRET=your-production-secret
+FRONTEND_ORIGIN=https://your-frontend-url.example.com
+AI_PROVIDER=gemini
+AI_MODEL=gemini-3.5-flash-lite
+GEMINI_API_KEY=your-gemini-api-key
+```
+
+`FRONTEND_ORIGIN` can contain multiple origins separated by commas, such as local and production URLs.
+
+5. Deploy `coding/frontend` as a static site.
+6. If the frontend and backend are on different domains, edit `coding/frontend/config.js` before deploying:
+
+```js
+window.RUNAI_CONFIG = {
+  apiBase: 'https://your-backend-url.example.com/api',
+};
+```
+
+If the frontend host proxies `/api` to the backend, the default production value in `config.js` can stay as `/api`.
+
 ## Supabase Notes
 
 Supabase Auth owns accounts in `auth.users`. RunAI profile data is stored in `public.profiles`; the app does not store `password_hash` in public tables.
