@@ -5,6 +5,6 @@
   window.RUNAI_CONFIG = {
     apiBase: isLocal
       ? 'http://localhost:4000/api'
-      : '/api',
+      : 'https://runai-backend.onrender.com/api',
   };
 }());
