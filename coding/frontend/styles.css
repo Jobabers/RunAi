@@ -473,16 +473,16 @@ textarea:focus {
 .dashboard-topbar {
   position: sticky;
   z-index: 4;
-  top: 0;
+  /*top: 0;*/
   display: flex;
   min-height: 68px;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(7, 5, 6, 0.78);
+  /*border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(7, 5, 6, 0.78);*/
   padding: 14px clamp(16px, 4vw, 44px);
-  backdrop-filter: blur(16px);
+  /*backdrop-filter: blur(16px);*/
 }
 
 .topbar-actions {
