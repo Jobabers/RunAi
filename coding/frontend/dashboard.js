@@ -883,17 +883,19 @@ function renderGateFlow() {
   elements.firstRunGate.classList.toggle('hidden', !needsFirstRun);
   elements.goalGate.classList.toggle('hidden', !needsGoal);
   elements.dashboardWorkspace.classList.toggle('hidden', !isDashboardReady);
+  return isDashboardReady;
 }
 
 function renderDashboard() {
   renderUser(dashboardState.user);
-  renderGateFlow();
+  const isDashboardReady = renderGateFlow();
   renderStats();
   renderQuestPanel();
   renderPlanTimeline();
   renderRecentRuns();
   renderProgressChart();
   renderCalendar();
+  return isDashboardReady;
 }
 
 async function loadDashboard() {
@@ -909,9 +911,9 @@ async function loadDashboard() {
       activePlan: dashboardData.active_plan || null,
     };
 
-    renderDashboard();
+    const isDashboardReady = renderDashboard();
     renderGoalAchievement();
-    window.loadRunInsights?.();
+    if (isDashboardReady) window.loadRunInsights?.();
   } catch (error) {
     showDashboardMessage(error.message, 'error');
   }
