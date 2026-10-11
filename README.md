@@ -16,6 +16,7 @@ RunAI is a web application for improving running performance with AI-assisted tr
 - Live verification on 2026-10-11 passed with the configured Supabase and real Gemini: Auth/profile/first run/goal, Gemini plan generation, 10km/55min completing the quest without achieving the goal, 10km/50min recording achievement, continue choice persisted through the dashboard RPC, progress analysis saved and cached, explicit goal/plan completion, and blocked submission after closure. The temporary test user was deleted afterward.
 - Repeat the live test from `coding/backend` with `$env:RUNAI_LIVE_TEST='1'; node scripts/check-sprint3-live.cjs`. This creates temporary Supabase data, calls Gemini, and removes its own test user in cleanup; it uses the configured project and may consume API quota.
 - Apply `coding/backend/database/sprint3-transactions.sql` after the schema and earlier Sprint 3 migrations. It provides service-role-only atomic commands for quest submission, run achievement, goal choices, adjustment persistence/decisions and expiry refresh. The configured Supabase project was migrated and verified on 2026-10-11.
+- Apply `coding/backend/database/security-rls.sql` after `sprint3-transactions.sql`. It prevents browser users from changing goals, plans, quests, progress, or AI records directly through Supabase Data API; all writes must go through the backend.
 - Pre-deployment acceptance passed: concurrent quest submissions produce exactly one run; concurrent adjustment accept/reject changes the decision once; invalid replacement rolls back all deleted/inserted sessions; past/today sessions are preserved; concurrent expiry records one result at Bangkok midnight; public keys cannot invoke privileged RPCs. Tests used disposable users and cleaned them up.
 - Sprint 3 pre-deployment scope is complete. Production deployment and post-deployment smoke tests are intentionally left to the project owner; the live tests above exercise local backend code against real Supabase/Gemini, not the currently deployed Render code.
 
@@ -114,7 +115,7 @@ In Supabase:
 
 1. Open your Supabase project.
 2. Go to SQL Editor.
-3. Run `coding/backend/database/schema.sql`.
+3. Run `coding/backend/database/schema.sql`, then the applicable Sprint migrations, ending with `coding/backend/database/security-rls.sql`.
 4. Go to Project Settings -> API Keys.
 5. Copy the Project URL, Publishable key, and Secret/service role key into `coding/backend/.env`.
 
@@ -170,7 +171,7 @@ Default URLs:
 ## Deployment Checklist
 
 1. Merge the branch you want to deploy.
-2. Run `coding/backend/database/schema.sql` in Supabase SQL Editor so the tables, indexes, and `get_runai_dashboard` RPC are up to date.
+2. Run `coding/backend/database/schema.sql`, the Sprint 3 migrations, and finally `coding/backend/database/security-rls.sql` in Supabase SQL Editor so tables, RPCs, and database permissions are up to date.
 3. Deploy `coding/backend` as a Node.js service.
    - Build command: `npm install`
    - Start command: `npm start`
