@@ -4,8 +4,9 @@ This is the plain HTML/CSS/JavaScript frontend for RunAI.
 
 Current scope:
 
-- `index.html` is the login screen.
-- `register.html` is the register screen.
+- `index.html` is the Google Sign-In screen.
+- `auth-callback.html` receives the Supabase Google session and creates the RunAI profile automatically.
+- `register.html` redirects old links to Google Sign-In; it no longer has a password form.
 - `dashboard.html` is the Sprint 2 workspace for profile, active goal, training plan, daily quest, running records, history, and progress.
 - `run.html` stores manual Running Records. Daily Quest submissions are sent from the dashboard quest panel.
 - `goal.html` allows one active goal at a time.
@@ -14,6 +15,7 @@ Current scope:
 - Dashboard unlock order is Profile -> First Run -> Goal -> auto-generated Training Plan -> Daily Quest dashboard.
 - Daily Quest success is decided by actual distance and can be submitted only once.
 - Failed or expired quests can show a pending AI plan adjustment that must be accepted before the future plan changes.
+- Google Sign-In needs the Google provider enabled in Supabase and a `SUPABASE_PUBLISHABLE_KEY` in the backend environment.
 
 Run it with:
 

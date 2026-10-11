@@ -34,8 +34,20 @@ async function ensureProfile(authUser, attrs = {}) {
   });
 }
 
+router.get('/google/config', (req, res, next) => {
+  try {
+    // A Supabase publishable key is intentionally safe for the browser.
+    res.json(authProvider.getBrowserAuthConfig());
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.post('/register', async (req, res, next) => {
   try {
+    if (authProvider.isSupabaseMode()) {
+      throw new HttpError(410, 'RunAI ใช้ Google Sign-In แล้ว กรุณาเข้าสู่ระบบด้วย Google');
+    }
     validateAuthInput(req.body);
     const { email, password } = req.body;
 
@@ -56,6 +68,9 @@ router.post('/register', async (req, res, next) => {
 
 router.post('/login', async (req, res, next) => {
   try {
+    if (authProvider.isSupabaseMode()) {
+      throw new HttpError(410, 'RunAI ใช้ Google Sign-In แล้ว กรุณาเข้าสู่ระบบด้วย Google');
+    }
     validateAuthInput(req.body);
     const { email, password } = req.body;
     const session = await authProvider.loginUser({ email, password });

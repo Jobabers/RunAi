@@ -2,10 +2,10 @@ const API_BASE = window.RUNAI_CONFIG?.apiBase || 'http://localhost:4000/api';
 const token = localStorage.getItem('runai_token');
 const el = (id) => document.getElementById(id);
 const message = el('pageMessage');
-function logout() { localStorage.removeItem('runai_token'); localStorage.removeItem('runai_user'); window.location.href = 'index.html'; }
+function logout() { window.runaiSignOut?.(); localStorage.removeItem('runai_token'); localStorage.removeItem('runai_user'); window.location.href = 'index.html'; }
 function show(messageText, type = 'success') { message.textContent = messageText; message.className = `message ${type}`; message.classList.toggle('hidden', !messageText); }
 async function api(path, options = {}) {
-  const response = await fetch(`${API_BASE}${path}`, { ...options, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } });
+  const response = await fetch(`${API_BASE}${path}`, { ...options, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('runai_token')}` } });
   const data = await response.json().catch(() => ({}));
   if (response.status === 401) { logout(); throw new Error('กรุณาเข้าสู่ระบบก่อนใช้งาน'); }
   if (!response.ok) throw new Error(data.error?.message || 'เชื่อมต่อ API ไม่สำเร็จ');

@@ -38,7 +38,7 @@ RunAI is a web application for improving running performance with AI-assisted tr
 - Accept or reject pending AI plan adjustments
 - Optional Gemini AI planner with rule-based fallback
 - Plain HTML/CSS/JavaScript frontend connected to the API
-- Current frontend screen set: login, register, profile, goal, run, history, and Sprint 2 dashboard
+- Current frontend screen set: Google Sign-In, OAuth callback, profile, goal, run, history, and dashboard
 - First dashboard flow: Profile -> First Run -> Goal -> auto-generated Training Plan -> Daily Quest dashboard
 
 Note: the backend runs with in-memory storage by default for local development. Set `STORAGE_DRIVER=supabase` and provide Supabase credentials to use persistent storage.
@@ -108,6 +108,20 @@ GEMINI_API_KEY=your-gemini-api-key
 
 Use `SUPABASE_SERVICE_ROLE_KEY` only in the backend. Do not put Supabase secret keys in frontend HTML, CSS, or browser JavaScript.
 Use `GEMINI_API_KEY` only in the backend as well. Do not put AI keys in frontend HTML, CSS, or browser JavaScript.
+
+### Google Sign-In Setup
+
+RunAI uses Google Sign-In through Supabase Auth. The browser only receives the safe Supabase Publishable key from the backend; never expose the Service Role key.
+
+1. In Google Cloud Console, create an OAuth Client ID with application type **Web application**.
+2. Add the local and production site origins, for example `http://localhost:3000` and `https://run-ai-kappa.vercel.app`.
+3. Add the Supabase callback URL as the Authorized redirect URI: `https://<your-project-ref>.supabase.co/auth/v1/callback`.
+4. In Supabase Dashboard, open **Authentication -> Providers -> Google**, enable Google, then paste the Google Client ID and Client Secret.
+5. In **Authentication -> URL Configuration**, set the Site URL to the production frontend URL and add these Redirect URLs:
+   - `http://localhost:3000/auth-callback.html`
+   - `https://run-ai-kappa.vercel.app/auth-callback.html`
+
+After Google Sign-In is enabled, RunAI creates the Supabase Auth user and the matching `public.profiles` row on the first login. The previous email/password register and login routes are disabled when `STORAGE_DRIVER=supabase`.
 
 ### 4. Setup Supabase Database
 
@@ -264,7 +278,7 @@ Use this checklist before opening a pull request for Sprint 2 work:
 
 - Set `STORAGE_DRIVER=supabase`, `AI_PROVIDER=gemini`, `AI_MODEL=gemini-3.5-flash-lite`, and `GEMINI_API_KEY` in `coding/backend/.env`.
 - Run the backend and frontend with `.\run-dev.ps1`.
-- Register a new test account and log in.
+- Sign in with a Google test account.
 - Complete Profile, First Run, and Goal.
 - Confirm that Training Plan generation returns `source = gemini` in the backend response or dashboard plan source pill.
 - Submit today's quest as completed when actual distance reaches the target distance.

@@ -85,6 +85,7 @@ let calendarCursor = new Date();
 let selectedCalendarDate = null;
 
 function redirectToLogin() {
+  window.runaiSignOut?.();
   localStorage.removeItem('runai_token');
   localStorage.removeItem('runai_user');
   window.location.href = 'index.html';
@@ -103,7 +104,7 @@ async function apiFetch(path, options = {}) {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${localStorage.getItem('runai_token')}`,
       ...(options.headers || {}),
     },
   });
