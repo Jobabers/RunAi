@@ -33,6 +33,12 @@
     </section>
 
     <p class="message hidden" id="dashboardMessage"></p>
+    <section id="goalAchievement" class="goal-achievement hidden" aria-live="polite">
+      <h2>บรรลุเป้าหมายแล้ว</h2>
+      <p id="goalAchievementText"></p>
+      <button class="primary-button compact-action-button" type="button" id="continueGoalButton">วิ่งตามตารางต่อ</button>
+      <button class="ghost-button" type="button" id="completeGoalButton">จบเป้าหมายนี้</button>
+    </section>
 
     <section class="profile-gate hidden" id="profileGate" aria-labelledby="profileGateTitle">
       <div class="gate-copy">
@@ -287,9 +293,24 @@
       </section>
 
     </div>
+    <section class="running-insights" aria-labelledby="insightsHeading">
+      <h2 id="insightsHeading">พัฒนาการและแผนการฝึก</h2>
+      <p id="insightsMessage" role="status"></p>
+      <p id="insightsMetrics"></p>
+      <p id="insightsSource"></p>
+      <p id="insightsSummary"></p>
+      <p id="insightsRecommendation"></p>
+      <button type="button" class="primary-button compact-action-button" id="analyzeProgressButton">วิเคราะห์พัฒนาการ</button>
+      <button type="button" class="ghost-button" id="retryAnalysisButton">ลองเตรียมแผนปรับใหม่</button>
+      <details id="planHistoryDetails">
+        <summary>ประวัติและรายละเอียดการปรับแผน</summary>
+        <div id="planHistoryList"></div>
+      </details>
+    </section>
   </main>
 
   <script src="config.js"></script>
   <script src="dashboard.js"></script>
+  <script src="insights.js"></script>
 </body>
 </html>

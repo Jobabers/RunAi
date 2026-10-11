@@ -1,30 +1,31 @@
 const store = require('../storage');
 
 function hasReachedGoalDistance(run, goal) {
-  return Number(run?.distance || 0) >= Number(goal?.target_distance || 0);
+  const distance = Number(run?.distance);
+  const duration = Number(run?.duration_minutes);
+  const target = Number(goal?.target_distance);
+  const targetTime = goal?.target_duration_minutes;
+  return Number.isFinite(distance) && Number.isFinite(duration)
+    && distance > 0 && duration > 0 && target > 0 && distance >= target
+    && (targetTime == null || (Number(targetTime) > 0 && duration <= Number(targetTime)));
 }
 
 async function completeActiveGoalIfReached(userId, run) {
   const activeGoal = await store.findActiveGoal(userId);
-  if (!activeGoal || !hasReachedGoalDistance(run, activeGoal)) {
+  if (!activeGoal || activeGoal.achieved_at || !hasReachedGoalDistance(run, activeGoal)) {
     return null;
   }
 
   const completedGoal = await store.updateRecord('goals', activeGoal.goal_id, {
-    status: 'completed',
+    achieved_at: new Date().toISOString(),
+    achieved_run_id: run.run_id,
+    achievement_choice: null,
   });
 
-  let completedPlan = null;
-  const activePlan = await store.findActivePlan(userId);
-  if (activePlan && Number(activePlan.goal_id) === Number(activeGoal.goal_id)) {
-    completedPlan = await store.updateRecord('training_plans', activePlan.training_plan_id, {
-      status: 'completed',
-    });
-  }
 
   return {
     goal: completedGoal,
-    active_plan: completedPlan,
+    achieved: true,
   };
 }
 

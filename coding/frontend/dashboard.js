@@ -163,7 +163,9 @@ function toDateInputValue(date) {
 }
 
 function getTodayKey() {
-  return toDateInputValue(new Date());
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+  const part = (type) => parts.find((item) => item.type === type).value;
+  return `${part('year')}-${part('month')}-${part('day')}`;
 }
 
 function getDefaultGoalDate() {
@@ -225,9 +227,7 @@ function getQuestRewardLabel(session) {
 
 function getTimeUntilMidnightText() {
   const now = new Date();
-  const midnight = new Date(now);
-  midnight.setDate(now.getDate() + 1);
-  midnight.setHours(0, 0, 0, 0);
+  const midnight = new Date(new Date(`${getTodayKey()}T00:00:00+07:00`).getTime() + 86400000);
   const diffMs = Math.max(0, midnight - now);
   const hours = Math.floor(diffMs / 3600000);
   const minutes = Math.floor((diffMs % 3600000) / 60000);
@@ -909,10 +909,37 @@ async function loadDashboard() {
     };
 
     renderDashboard();
+    renderGoalAchievement();
+    window.loadRunInsights?.();
   } catch (error) {
     showDashboardMessage(error.message, 'error');
   }
 }
+
+function renderGoalAchievement() {
+  const goal = getActiveGoal(dashboardState.goals);
+  document.getElementById('goalAchievement').classList.toggle('hidden', !goal?.achieved_at);
+  document.getElementById('goalAchievementText').textContent = goal?.achievement_choice === 'continue'
+    ? 'คุณเลือกฝึกตามแผนเดิมต่อ และสามารถจบเป้าหมายนี้ได้ภายหลัง'
+    : 'คุณวิ่งผ่านเงื่อนไขเป้าหมายแล้ว ต้องการฝึกต่อหรือจบเป้าหมายนี้?';
+  document.getElementById('continueGoalButton').hidden = goal?.achievement_choice === 'continue';
+}
+
+async function chooseGoalAchievement(choice) {
+  const goal = getActiveGoal(dashboardState.goals);
+  if (!goal?.achieved_at) return;
+  const buttons = document.querySelectorAll('#goalAchievement button');
+  buttons.forEach((button) => { button.disabled = true; });
+  try {
+    await apiFetch(`/goals/${goal.goal_id}/${choice}`, { method: 'PATCH' });
+    await loadDashboard();
+    showDashboardMessage(choice === 'continue' ? 'ฝึกตามแผนเดิมต่อได้เลย' : 'จบเป้าหมายและแผนการฝึกแล้ว');
+  } catch (error) { showDashboardMessage(error.message, 'error'); }
+  finally { buttons.forEach((button) => { button.disabled = false; }); }
+}
+
+document.getElementById('continueGoalButton').addEventListener('click', () => chooseGoalAchievement('continue'));
+document.getElementById('completeGoalButton').addEventListener('click', () => chooseGoalAchievement('complete'));
 
 async function handleFirstRunSubmit(event) {
   event.preventDefault();
@@ -1108,8 +1135,10 @@ async function handleQuestSubmit(event) {
     updateQuestOutcomeFields();
     await loadDashboard();
     const completedGoal = result.goal_completion?.goal;
-    if (completedGoal) {
-      showDashboardMessage('ส่งเควสสำเร็จแล้ว และคุณทำเป้าหมายสำเร็จแล้ว');
+    if (result.analysis_retry_required) {
+      showDashboardMessage('บันทึกผลเควสแล้ว แต่เตรียมแผนไม่สำเร็จ สามารถลองเตรียมแผนใหม่ได้โดยไม่ส่งเควสซ้ำ', 'error');
+    } else if (completedGoal) {
+      showDashboardMessage('ส่งเควสสำเร็จและบรรลุเงื่อนไขเป้าหมายแล้ว เลือกฝึกต่อหรือจบเป้าหมายได้');
     } else {
       showDashboardMessage(isCompleted ? 'ส่งเควสสำเร็จแล้ว' : 'บันทึกเควสไม่สำเร็จแล้ว', isCompleted ? 'success' : 'error');
     }

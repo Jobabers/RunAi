@@ -24,7 +24,7 @@ el('runForm').addEventListener('submit', async (event) => {
     const result = await api('/runs', { method: 'POST', body: JSON.stringify(payload) });
     el('runForm').reset();
     el('runDateInput').value = today();
-    show(result.goal_completion?.goal ? 'บันทึก Running Record แล้ว และคุณทำเป้าหมายสำเร็จแล้ว' : 'บันทึก Running Record แล้ว');
+    show(result.goal_completion?.goal ? 'บันทึกแล้วและบรรลุเงื่อนไขเป้าหมาย ไปที่ Dashboard เพื่อเลือกฝึกต่อหรือจบเป้าหมาย' : 'บันทึก Running Record แล้ว');
   }
   catch (error) { show(error.message, 'error'); }
 });

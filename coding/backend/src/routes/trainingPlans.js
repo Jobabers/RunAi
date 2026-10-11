@@ -9,16 +9,23 @@ const { compareDateKey, toDateKey } = require('../utils/dates');
 const { assertCondition, HttpError } = require('../utils/httpError');
 
 const router = express.Router();
+const adjustmentTasks = new Map();
 
 function isProfileComplete(user) {
   return Boolean(user?.name && user?.age && user?.weight && user?.height && user?.experience_level);
 }
 
-function hasAdjustmentForSession(plan, session) {
-  return store.hasAnalysisForFailedSession(plan.training_plan_id, session.training_session_id);
+async function createPendingAdjustment({ user, plan, failedSession, reason, triggerType = 'failed_quest' }) {
+  const key = plan.training_plan_id;
+  if (adjustmentTasks.has(key)) return adjustmentTasks.get(key);
+  const task = prepareAdjustment({ user, plan, failedSession, reason, triggerType });
+  adjustmentTasks.set(key, task);
+  try { return await task; }
+  finally { adjustmentTasks.delete(key); }
 }
 
-async function createPendingAdjustment({ user, plan, failedSession, reason, triggerType = 'failed_quest' }) {
+async function prepareAdjustment({ user, plan, failedSession, reason, triggerType }) {
+  assertCondition(plan?.status === 'active', 409, 'แผนการฝึกนี้จบแล้ว');
   const existingPendingAdjustment = await store.findPendingAdjustmentForPlan(plan.training_plan_id);
   if (existingPendingAdjustment) {
     return existingPendingAdjustment;
@@ -46,7 +53,7 @@ async function createPendingAdjustment({ user, plan, failedSession, reason, trig
     triggerType,
   });
 
-  const analysis = await store.createRecord('ai_analysis', {
+  const analysisAttrs = {
     user_id: user.user_id,
     training_plan_id: plan.training_plan_id,
     trigger_type: triggerType,
@@ -58,9 +65,15 @@ async function createPendingAdjustment({ user, plan, failedSession, reason, trig
       failed_session_id: failedSession.training_session_id,
       reason,
       fallback_reason: aiAdjustment.reason || null,
+      previous_sessions: futureSessions,
+      from_version: plan.version,
     },
+  };
+  if (store.atomicMutate) return store.atomicMutate(user.user_id, 'save_adjustment', {
+    plan_id: plan.training_plan_id, trigger_type: triggerType, analysis: analysisAttrs.result_json,
+    reason, sessions: aiAdjustment.sessions,
   });
-
+  const analysis = await store.createRecord('ai_analysis', analysisAttrs);
   return store.createRecord('plan_adjustments', {
     training_plan_id: plan.training_plan_id,
     ai_analysis_id: analysis.ai_analysis_id,
@@ -74,9 +87,13 @@ async function ensureExpiredAdjustments(user, plan) {
   await store.refreshPlanState(plan);
   const sessions = await store.getPlanSessions(plan.training_plan_id);
   let expiredSession = null;
+  const adjustments = await store.listAdjustmentsForPlan(plan.training_plan_id);
+  const analyses = await store.listAnalysesForUser(user.user_id);
 
   for (const session of sessions) {
-    if (session.status === 'expired' && !(await hasAdjustmentForSession(plan, session))) {
+    const handled = analyses.some((analysis) => Number(analysis.result_json?.failed_session_id) === Number(session.training_session_id)
+      && adjustments.some((adjustment) => adjustment.ai_analysis_id === analysis.ai_analysis_id));
+    if (['expired', 'failed'].includes(session.status) && !handled) {
       expiredSession = session;
       break;
     }
@@ -88,8 +105,8 @@ async function ensureExpiredAdjustments(user, plan) {
     user,
     plan,
     failedSession: expiredSession,
-    reason: 'Quest expired at 23:59',
-    triggerType: 'expired_quest',
+    reason: expiredSession.status === 'expired' ? 'Quest expired at 00:00 next day' : (await store.findProgressBySessionId(expiredSession.training_session_id))?.failure_reason || 'Quest failed',
+    triggerType: expiredSession.status === 'expired' ? 'expired_quest' : 'failed_quest',
   });
 }
 
@@ -98,6 +115,16 @@ function queueExpiredAdjustmentCheck(user, plan) {
     console.error('Failed to prepare expired quest adjustment:', error);
   });
 }
+
+router.post('/training-plans/:planId/retry-analysis', async (req, res, next) => {
+  try {
+    const plan = await store.findPlanForUser(req.user.user_id, req.params.planId);
+    assertCondition(plan, 404, 'ไม่พบแผนการฝึก');
+    assertCondition(plan.status === 'active', 409, 'แผนการฝึกนี้จบแล้ว');
+    const adjustment = await ensureExpiredAdjustments(req.user, plan);
+    res.json({ adjustment });
+  } catch (error) { next(error); }
+});
 
 router.get('/training-plans/active', async (req, res, next) => {
   try {
@@ -189,6 +216,10 @@ router.post('/training-plans/generate', async (req, res, next) => {
 
 router.post('/training-plans/adjustments/:adjustmentId/accept', async (req, res, next) => {
   try {
+    if (store.atomicMutate) {
+      const result = await store.atomicMutate(req.user.user_id, 'adjustment_decision', { adjustment_id: req.params.adjustmentId, outcome: 'accepted' });
+      return res.json({ ...result, plan: await store.serializePlan(result.plan) });
+    }
     const adjustment = await store.findAdjustmentById(req.params.adjustmentId);
 
     if (!adjustment) {
@@ -202,13 +233,14 @@ router.post('/training-plans/adjustments/:adjustmentId/accept', async (req, res,
     }
 
     assertCondition(adjustment.status === 'pending', 409, 'แผนนี้ถูกดำเนินการแล้ว');
+    assertCondition(plan.status === 'active', 409, 'แผนการฝึกนี้จบแล้ว');
 
     const today = toDateKey();
     await store.deleteFutureSessions(plan.training_plan_id, today);
 
     await store.createRecords(
       'training_sessions',
-      adjustment.proposed_sessions.map((session) => ({
+      adjustment.proposed_sessions.filter((session) => compareDateKey(session.session_date, today) > 0).map((session) => ({
         training_plan_id: plan.training_plan_id,
         session_date: session.session_date,
         training_type: session.training_type,
@@ -243,6 +275,10 @@ router.post('/training-plans/adjustments/:adjustmentId/accept', async (req, res,
 
 router.post('/training-plans/adjustments/:adjustmentId/reject', async (req, res, next) => {
   try {
+    if (store.atomicMutate) {
+      const result = await store.atomicMutate(req.user.user_id, 'adjustment_decision', { adjustment_id: req.params.adjustmentId, outcome: 'rejected' });
+      return res.json({ ...result, plan: await store.serializePlan(result.plan) });
+    }
     const adjustment = await store.findAdjustmentById(req.params.adjustmentId);
 
     if (!adjustment) {
