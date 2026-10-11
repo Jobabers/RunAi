@@ -5,6 +5,7 @@ const elements = {
   message: document.getElementById('dashboardMessage'),
   userLabel: document.getElementById('currentUserLabel'),
   logoutButton: document.getElementById('logoutButton'),
+  topbarNav: document.getElementById('topbarNav'),
   nextActionText: document.getElementById('nextActionText'),
   profileGate: document.getElementById('profileGate'),
   profileGateForm: document.getElementById('profileGateForm'),
@@ -883,6 +884,7 @@ function renderGateFlow() {
   elements.firstRunGate.classList.toggle('hidden', !needsFirstRun);
   elements.goalGate.classList.toggle('hidden', !needsGoal);
   elements.dashboardWorkspace.classList.toggle('hidden', !isDashboardReady);
+  elements.topbarNav.classList.toggle('hidden', !isDashboardReady);
   return isDashboardReady;
 }
 
