@@ -31,7 +31,16 @@
       </div>
     </section>
 
-    <p class="message hidden" id="dashboardMessage"></p>
+    <aside class="notification-container hidden" id="dashboardMessage" aria-live="polite" aria-atomic="true">
+      <div class="notification-item" id="dashboardMessageItem" role="status">
+        <div class="notification-content">
+          <span class="notification-icon" id="dashboardMessageIcon" aria-hidden="true">!</span>
+          <p class="notification-text" id="dashboardMessageText"></p>
+        </div>
+        <button class="notification-close" id="dashboardMessageClose" type="button" aria-label="ปิดการแจ้งเตือน">&times;</button>
+        <span class="notification-progress-bar" id="dashboardMessageProgress" aria-hidden="true"></span>
+      </div>
+    </aside>
     <section id="goalAchievement" class="goal-achievement hidden" aria-live="polite">
       <h2>บรรลุเป้าหมายแล้ว</h2>
       <p id="goalAchievementText"></p>
