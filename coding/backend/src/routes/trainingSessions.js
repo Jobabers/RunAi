@@ -19,12 +19,21 @@ function createRunFromQuest(userId, body, session) {
 }
 
 async function assertSubmittable(session) {
+  const plan = await store.findPlanById(session.training_plan_id);
+  assertCondition(plan?.status === 'active', 409, 'แผนการฝึกนี้จบแล้ว');
   assertCondition(session.status === 'available', 409, 'เควสนี้ยังไม่เปิดให้ส่งผล');
   assertCondition(!(await store.findProgressBySessionId(session.training_session_id)), 409, 'เควสนี้ถูกส่งผลแล้ว ไม่สามารถแก้ไขผลการส่งได้');
 }
 
 router.post('/training-sessions/:sessionId/submit', async (req, res, next) => {
   try {
+    validateQuestResult(req.body, true);
+    if (store.atomicMutate) {
+      return res.status(201).json(await store.atomicMutate(req.user.user_id, 'quest', {
+        session_id: req.params.sessionId, outcome: 'completed', distance: Number(req.body.actual_distance),
+        duration: Number(req.body.actual_duration_minutes), image_url: req.body.strava_image_url || null,
+      }));
+    }
     const session = await store.findSessionForUser(req.user.user_id, req.params.sessionId);
     if (!session) {
       throw new HttpError(404, 'ไม่พบเควส');
@@ -72,6 +81,22 @@ router.post('/training-sessions/:sessionId/submit', async (req, res, next) => {
 
 router.post('/training-sessions/:sessionId/fail', async (req, res, next) => {
   try {
+    validateQuestResult(req.body, false);
+    if (store.atomicMutate) {
+      const result = await store.atomicMutate(req.user.user_id, 'quest', {
+        session_id: req.params.sessionId, outcome: 'failed',
+        distance: req.body.actual_distance ? Number(req.body.actual_distance) : null,
+        duration: req.body.actual_duration_minutes ? Number(req.body.actual_duration_minutes) : null,
+        reason: req.body.failure_reason, image_url: req.body.strava_image_url || null,
+      });
+      let adjustment = null;
+      let retry = false;
+      try {
+        const plan = await store.findPlanForUser(req.user.user_id, result.session.training_plan_id);
+        adjustment = await createPendingAdjustment({ user: req.user, plan, failedSession: result.session, reason: req.body.failure_reason });
+      } catch { retry = true; }
+      return res.status(201).json({ ...result, pending_adjustment: adjustment, analysis_retry_required: retry });
+    }
     const session = await store.findSessionForUser(req.user.user_id, req.params.sessionId);
     if (!session) {
       throw new HttpError(404, 'ไม่พบเควส');
@@ -108,17 +133,27 @@ router.post('/training-sessions/:sessionId/fail', async (req, res, next) => {
     });
 
     const plan = await store.findPlanForUser(req.user.user_id, session.training_plan_id);
-    const adjustment = await createPendingAdjustment({
-      user: req.user,
-      plan,
-      failedSession,
-      reason: progress.failure_reason,
-    });
-
-    res.status(201).json({ session: failedSession, progress, run, pending_adjustment: adjustment });
+    let adjustment = null;
+    let analysisRetryRequired = false;
+    try {
+      adjustment = await createPendingAdjustment({ user: req.user, plan, failedSession, reason: progress.failure_reason });
+    } catch {
+      analysisRetryRequired = true;
+    }
+    res.status(201).json({ session: failedSession, progress, run, pending_adjustment: adjustment, analysis_retry_required: analysisRetryRequired });
   } catch (err) {
     next(err);
   }
 });
 
 module.exports = router;
+
+function validateQuestResult(body, completed) {
+  if (!completed) assertCondition(typeof body.failure_reason === 'string' && body.failure_reason.trim(), 400, 'กรุณาระบุเหตุผล');
+  const hasResult = completed || body.actual_distance != null || body.actual_duration_minutes != null;
+  if (!hasResult) return;
+  const distance = Number(body.actual_distance);
+  const duration = Number(body.actual_duration_minutes);
+  assertCondition(Number.isFinite(distance) && distance > 0 && distance <= 300, 400, 'ระยะทางไม่ถูกต้อง');
+  assertCondition(Number.isInteger(duration) && duration > 0 && duration <= 1440, 400, 'เวลาต้องเป็นนาทีจำนวนเต็มตั้งแต่ 1 ถึง 1440');
+}

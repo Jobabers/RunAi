@@ -45,6 +45,13 @@ router.get('/runs', async (req, res, next) => {
 router.post('/runs', async (req, res, next) => {
   try {
     validateRunInput(req.body);
+    if (store.atomicMutate) {
+      const result = await store.atomicMutate(req.user.user_id, 'run', {
+        distance: Number(req.body.distance), duration: Number(req.body.duration_minutes),
+        run_date: req.body.run_date, run_type: req.body.run_type || 'Easy Run',
+      });
+      return res.status(201).json(result);
+    }
 
     const run = await store.createRecord('runs', {
       user_id: req.user.user_id,

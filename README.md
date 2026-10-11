@@ -2,6 +2,23 @@
 
 RunAI is a web application for improving running performance with AI-assisted training plans, daily quests, and a feedback loop after each quest result.
 
+## Sprint 3 Progress
+
+- Goal achievement checks distance and duration from the same run. Distance-only goals remain supported when no target duration is set.
+- Achievement records `achieved_at` and `achieved_run_id`; it does not close the goal or plan.
+- Dashboard offers Continue Training or Complete Goal. Continuing preserves the active plan and the option to finish later.
+- Apply `coding/backend/database/sprint3-goal-achievement.sql` in Supabase before deploying this backend. It preserves existing completed goals; it does not reopen or backfill them.
+- Apply `coding/backend/database/sprint3-analysis.sql` as well to enable the `progress_review` analysis type.
+- Dashboard now compares the latest five runs with the previous five using total duration / total distance for pace. Gemini analysis is requested explicitly and cached when its input metrics have not changed. Errors preserve the last saved analysis.
+- Adjustment history includes reasons, provider, decision time, and a snapshot of the original sessions next to proposed sessions. Older records without snapshots are labeled accordingly.
+- Failed quest results remain saved if adjustment preparation fails. Retry prepares the adjustment without creating another running record or quest submission. Normal reads also attempt recovery for unprocessed failed/expired quests.
+- Automated verification uses in-memory storage and mocked Gemini responses, not production accounts. Run `npm test` in `coding/backend`. Browser checks: `node coding/backend/scripts/check-sprint3-ui.cjs` from the repository root with Playwright available; defaults to installed Edge. Set `RUNAI_PLAYWRIGHT_PATH` for an external Playwright installation and `RUNAI_BROWSER_CHANNEL` to select another installed browser.
+- Live verification on 2026-10-11 passed with the configured Supabase and real Gemini: Auth/profile/first run/goal, Gemini plan generation, 10km/55min completing the quest without achieving the goal, 10km/50min recording achievement, continue choice persisted through the dashboard RPC, progress analysis saved and cached, explicit goal/plan completion, and blocked submission after closure. The temporary test user was deleted afterward.
+- Repeat the live test from `coding/backend` with `$env:RUNAI_LIVE_TEST='1'; node scripts/check-sprint3-live.cjs`. This creates temporary Supabase data, calls Gemini, and removes its own test user in cleanup; it uses the configured project and may consume API quota.
+- Apply `coding/backend/database/sprint3-transactions.sql` after the schema and earlier Sprint 3 migrations. It provides service-role-only atomic commands for quest submission, run achievement, goal choices, adjustment persistence/decisions and expiry refresh. The configured Supabase project was migrated and verified on 2026-10-11.
+- Pre-deployment acceptance passed: concurrent quest submissions produce exactly one run; concurrent adjustment accept/reject changes the decision once; invalid replacement rolls back all deleted/inserted sessions; past/today sessions are preserved; concurrent expiry records one result at Bangkok midnight; public keys cannot invoke privileged RPCs. Tests used disposable users and cleaned them up.
+- Sprint 3 pre-deployment scope is complete. Production deployment and post-deployment smoke tests are intentionally left to the project owner; the live tests above exercise local backend code against real Supabase/Gemini, not the currently deployed Render code.
+
 ## Current Sprint 2 MVP
 
 - Backend API with Express

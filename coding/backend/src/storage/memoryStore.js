@@ -1,4 +1,4 @@
-const { compareDateKey, eachDate, toDateKey } = require('../utils/dates');
+const { addDays, compareDateKey, eachDate, toDateKey } = require('../utils/dates');
 
 const db = {
   profiles: [],
@@ -245,6 +245,7 @@ function deleteFutureSessions(planId, afterDate) {
 function refreshPlanState(plan) {
   const today = toDateKey();
   const sessions = getPlanSessions(plan.training_plan_id);
+  if (plan.status !== 'active') return sessions;
 
   for (const session of sessions) {
     const progress = findProgressBySessionId(session.training_session_id);
@@ -263,7 +264,7 @@ function refreshPlanState(plan) {
         actual_distance: null,
         actual_duration_minutes: null,
         failure_reason: null,
-        submitted_at: new Date(`${session.session_date}T23:59:00`).toISOString(),
+        submitted_at: new Date(`${addDays(session.session_date, 1)}T00:00:00+07:00`).toISOString(),
         strava_image_url: null,
       });
       session.status = 'expired';
@@ -318,6 +319,8 @@ function resetForTests() {
 }
 
 module.exports = {
+  listAnalysesForUser: (userId) => db.ai_analysis.filter((row) => sameUserId(row.user_id, userId)).sort((a, b) => b.ai_analysis_id - a.ai_analysis_id),
+  listAdjustmentsForPlan: (planId) => db.plan_adjustments.filter((row) => row.training_plan_id === Number(planId)).sort((a, b) => b.plan_adjustment_id - a.plan_adjustment_id),
   createRecords,
   createRecord,
   db,

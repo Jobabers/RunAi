@@ -28,6 +28,7 @@ router.post('/goals', async (req, res, next) => {
 
     assertCondition(goal_type, 400, 'กรุณาระบุประเภทเป้าหมาย');
     assertCondition(Number(target_distance) > 0, 400, 'ระยะทางเป้าหมายต้องมากกว่า 0');
+    assertCondition(target_duration_minutes == null || (Number.isFinite(Number(target_duration_minutes)) && Number(target_duration_minutes) > 0), 400, 'เวลาเป้าหมายต้องมากกว่า 0');
     assertCondition(target_date, 400, 'กรุณาระบุวันที่ต้องการบรรลุเป้าหมาย');
     assertCondition(new Date(`${target_date}T00:00:00`) > new Date(new Date().toDateString()), 400, 'วันที่เป้าหมายต้องเป็นวันในอนาคต');
     assertCondition(isProfileComplete(req.user), 400, 'กรุณากรอกข้อมูล Profile ให้ครบก่อนสร้าง Goal');
@@ -53,15 +54,26 @@ router.post('/goals', async (req, res, next) => {
   }
 });
 
+router.patch('/goals/:goalId/continue', async (req, res, next) => {
+  try {
+    if (store.atomicMutate) return res.json(await store.atomicMutate(req.user.user_id, 'goal_choice', { goal_id: req.params.goalId, outcome: 'continue' }));
+    const goal = await store.findGoalForUser(req.user.user_id, req.params.goalId);
+    assertCondition(goal, 404, 'ไม่พบเป้าหมาย');
+    assertCondition(goal.status === 'active' && goal.achieved_at, 409, 'เป้าหมายยังไม่บรรลุเงื่อนไขหรือจบแล้ว');
+    res.json({ goal: await store.updateRecord('goals', goal.goal_id, { achievement_choice: 'continue' }) });
+  } catch (err) { next(err); }
+});
+
 router.patch('/goals/:goalId/complete', async (req, res, next) => {
   try {
+    if (store.atomicMutate) return res.json(await store.atomicMutate(req.user.user_id, 'goal_choice', { goal_id: req.params.goalId, outcome: 'complete' }));
     const goal = await store.findGoalForUser(req.user.user_id, req.params.goalId);
 
     if (!goal) {
       throw new HttpError(404, 'ไม่พบเป้าหมาย');
     }
 
-    const completedGoal = await store.updateRecord('goals', goal.goal_id, { status: 'completed' });
+    assertCondition(goal.status === 'active' && goal.achieved_at, 409, 'เป้าหมายยังไม่บรรลุเงื่อนไขหรือจบแล้ว');
 
     let plan = await store.findActivePlan(req.user.user_id);
     if (plan && Number(plan.goal_id) === Number(goal.goal_id)) {
@@ -70,6 +82,7 @@ router.patch('/goals/:goalId/complete', async (req, res, next) => {
       });
     }
 
+    const completedGoal = await store.updateRecord('goals', goal.goal_id, { status: 'completed', achievement_choice: 'complete' });
     res.json({ goal: completedGoal, active_plan: plan || null });
   } catch (err) {
     next(err);

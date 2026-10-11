@@ -68,12 +68,16 @@ async function supabaseFetch(table, { method = 'GET', params = null, body = null
   }
 
   if (!response.ok) {
+    if (data?.code === 'PGRST202' && table === 'rpc/runai_mutate') {
+      throw new HttpError(503, 'กรุณารัน sprint3-transactions.sql ใน Supabase ก่อนใช้งาน');
+    }
     if (data?.code === 'PGRST205') {
       throw new HttpError(503, 'ยังไม่ได้รัน Supabase schema ใหม่ กรุณาสร้างตาราง profiles ก่อน', data);
     }
 
     const message = data?.message || data?.error || 'เชื่อมต่อ Supabase ไม่สำเร็จ';
-    throw new HttpError(500, message, data);
+    const status = /^PT(400|404|409|422)$/.test(data?.code || '') ? Number(data.code.slice(2)) : data?.code === '23505' ? 409 : 500;
+    throw new HttpError(status, message, data);
   }
 
   return data;
@@ -210,62 +214,8 @@ async function listProgressForSessionIds(sessionIds) {
 }
 
 async function refreshPlanState(plan, preloadedSessions = null) {
-  const today = toDateKey();
-  const sessions = preloadedSessions || await getPlanSessions(plan.training_plan_id);
-  const progressRows = await listProgressForSessionIds(
-    sessions.map((session) => session.training_session_id),
-  );
-  const progressBySessionId = new Map(
-    progressRows.map((progress) => [Number(progress.training_session_id), progress]),
-  );
-  const refreshedSessions = [];
-
-  for (const session of sessions) {
-    const progress = progressBySessionId.get(Number(session.training_session_id));
-
-    if (progress) {
-      if (session.status !== progress.status) {
-        const updatedSession = await updateRecord('training_sessions', session.training_session_id, {
-          status: progress.status,
-        });
-        refreshedSessions.push(updatedSession || { ...session, status: progress.status });
-      } else {
-        refreshedSessions.push(session);
-      }
-      continue;
-    }
-
-    if (compareDateKey(session.session_date, today) < 0) {
-      await createRecord('training_progress', {
-        training_session_id: session.training_session_id,
-        run_id: null,
-        status: 'expired',
-        actual_distance: null,
-        actual_duration_minutes: null,
-        failure_reason: null,
-        submitted_at: new Date(`${session.session_date}T23:59:00`).toISOString(),
-        strava_image_url: null,
-      });
-      const updatedSession = await updateRecord('training_sessions', session.training_session_id, {
-        status: 'expired',
-      });
-      refreshedSessions.push(updatedSession || { ...session, status: 'expired' });
-      continue;
-    }
-
-    const nextStatus = compareDateKey(session.session_date, today) > 0 ? 'locked' : 'available';
-    if (session.status !== nextStatus) {
-      const updatedSession = await updateRecord('training_sessions', session.training_session_id, {
-        status: nextStatus,
-      });
-      refreshedSessions.push(updatedSession || { ...session, status: nextStatus });
-      continue;
-    }
-
-    refreshedSessions.push(session);
-  }
-
-  return refreshedSessions;
+  if (plan.status !== 'active') return preloadedSessions || getPlanSessions(plan.training_plan_id);
+  return atomicMutate(plan.user_id, 'refresh', { plan_id: plan.training_plan_id });
 }
 
 async function findActivePlan(userId, options = {}) {
@@ -431,6 +381,9 @@ function resetForTests() {
 }
 
 module.exports = {
+  atomicMutate,
+  listAnalysesForUser: (userId) => selectRows('ai_analysis', [['user_id', 'eq', userId]], { order: 'created_at.desc' }),
+  listAdjustmentsForPlan: (planId) => selectRows('plan_adjustments', [['training_plan_id', 'eq', planId]], { order: 'created_at.desc' }),
   createRecord,
   createRecords,
   deleteFutureSessions,
@@ -457,3 +410,7 @@ module.exports = {
   serializePlan,
   updateRecord,
 };
+
+function atomicMutate(userId, action, data) {
+  return supabaseFetch('rpc/runai_mutate', { method: 'POST', body: { p_user: userId, p_action: action, p_data: data } });
+}

@@ -37,6 +37,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api', requireAuth, dashboardRoutes);
 app.use('/api', requireAuth, profileRoutes);
 app.use('/api', requireAuth, goalRoutes);
+app.use('/api', requireAuth, require('./routes/insights'));
 app.use('/api', requireAuth, runRoutes);
 app.use('/api', requireAuth, trainingPlanRoutes);
 app.use('/api', requireAuth, trainingSessionRoutes);

@@ -320,7 +320,7 @@ test('completes a daily quest once and rejects a forced fail after reaching targ
   assert.equal(duplicateComplete.response.status, 409);
 });
 
-test('auto-completes the active goal and plan when a quest reaches the goal distance early', async (t) => {
+test('records achievement and keeps the plan active until the user completes it', async (t) => {
   store.resetForTests();
   authProvider.resetForTests();
   const server = await listen(app);
@@ -388,6 +388,9 @@ test('auto-completes the active goal and plan when a quest reaches the goal dist
   });
   assert.equal(plan.response.status, 201);
 
+  const prematureCompletion = await request(baseUrl, `/goals/${goal.data.goal.goal_id}/complete`, { token, method: 'PATCH' });
+  assert.equal(prematureCompletion.response.status, 409);
+
   const session = plan.data.plan.sessions[0];
   const completed = await request(baseUrl, `/training-sessions/${session.training_session_id}/submit`, {
     method: 'POST',
@@ -399,14 +402,26 @@ test('auto-completes the active goal and plan when a quest reaches the goal dist
   });
 
   assert.equal(completed.response.status, 201);
-  assert.equal(completed.data.goal_completion.goal.status, 'completed');
-  assert.equal(completed.data.goal_completion.active_plan.status, 'completed');
+  assert.equal(completed.data.goal_completion.goal.status, 'active');
+  assert.ok(completed.data.goal_completion.goal.achieved_at);
+  assert.equal(completed.data.goal_completion.goal.achieved_run_id, completed.data.run.run_id);
 
   const activePlan = await request(baseUrl, '/training-plans/active', {
     token,
   });
   assert.equal(activePlan.response.status, 200);
-  assert.equal(activePlan.data.plan, null);
+  assert.equal(activePlan.data.plan.status, 'active');
+
+  const continued = await request(baseUrl, `/goals/${goal.data.goal.goal_id}/continue`, { token, method: 'PATCH' });
+  assert.equal(continued.data.goal.achievement_choice, 'continue');
+  assert.equal(continued.data.goal.status, 'active');
+  const finished = await request(baseUrl, `/goals/${goal.data.goal.goal_id}/complete`, { token, method: 'PATCH' });
+  assert.equal(finished.response.status, 200);
+  assert.equal(finished.data.active_plan.status, 'completed');
+  const closedPlanSubmit = await request(baseUrl, `/training-sessions/${session.training_session_id}/submit`, {
+    token, method: 'POST', body: { actual_distance: 10, actual_duration_minutes: 50 },
+  });
+  assert.equal(closedPlanSubmit.response.status, 409);
 
   const goals = await request(baseUrl, '/goals', {
     token,
