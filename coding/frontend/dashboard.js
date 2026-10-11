@@ -3,8 +3,14 @@ const token = localStorage.getItem('runai_token');
 
 const elements = {
   message: document.getElementById('dashboardMessage'),
+  messageItem: document.getElementById('dashboardMessageItem'),
+  messageText: document.getElementById('dashboardMessageText'),
+  messageIcon: document.getElementById('dashboardMessageIcon'),
+  messageClose: document.getElementById('dashboardMessageClose'),
+  messageProgress: document.getElementById('dashboardMessageProgress'),
   userLabel: document.getElementById('currentUserLabel'),
   logoutButton: document.getElementById('logoutButton'),
+  topbarNav: document.getElementById('topbarNav'),
   nextActionText: document.getElementById('nextActionText'),
   profileGate: document.getElementById('profileGate'),
   profileGateForm: document.getElementById('profileGateForm'),
@@ -83,6 +89,7 @@ let dashboardState = {
 
 let calendarCursor = new Date();
 let selectedCalendarDate = null;
+let dashboardMessageTimer;
 
 function redirectToLogin() {
   window.runaiSignOut?.();
@@ -92,11 +99,23 @@ function redirectToLogin() {
 }
 
 function showDashboardMessage(message, type = 'success') {
-  if (!elements.message) return;
+  if (!elements.message || !elements.messageItem) return;
 
-  elements.message.textContent = message;
-  elements.message.className = `message ${type}`;
-  elements.message.classList.toggle('hidden', !message);
+  window.clearTimeout(dashboardMessageTimer);
+
+  if (!message) {
+    elements.message.classList.add('hidden');
+    return;
+  }
+
+  elements.messageText.textContent = message;
+  elements.messageIcon.textContent = type === 'success' ? '✓' : '!';
+  elements.messageItem.className = `notification-item ${type}`;
+  elements.message.classList.remove('hidden');
+  elements.messageProgress.classList.remove('is-running');
+  void elements.messageProgress.offsetWidth;
+  elements.messageProgress.classList.add('is-running');
+  dashboardMessageTimer = window.setTimeout(() => showDashboardMessage(''), 5000);
 }
 
 async function apiFetch(path, options = {}) {
@@ -883,17 +902,20 @@ function renderGateFlow() {
   elements.firstRunGate.classList.toggle('hidden', !needsFirstRun);
   elements.goalGate.classList.toggle('hidden', !needsGoal);
   elements.dashboardWorkspace.classList.toggle('hidden', !isDashboardReady);
+  elements.topbarNav.classList.toggle('hidden', !isDashboardReady);
+  return isDashboardReady;
 }
 
 function renderDashboard() {
   renderUser(dashboardState.user);
-  renderGateFlow();
+  const isDashboardReady = renderGateFlow();
   renderStats();
   renderQuestPanel();
   renderPlanTimeline();
   renderRecentRuns();
   renderProgressChart();
   renderCalendar();
+  return isDashboardReady;
 }
 
 async function loadDashboard() {
@@ -909,9 +931,9 @@ async function loadDashboard() {
       activePlan: dashboardData.active_plan || null,
     };
 
-    renderDashboard();
+    const isDashboardReady = renderDashboard();
     renderGoalAchievement();
-    window.loadRunInsights?.();
+    if (isDashboardReady) window.loadRunInsights?.();
   } catch (error) {
     showDashboardMessage(error.message, 'error');
   }
@@ -1103,7 +1125,7 @@ async function handleQuestSubmit(event) {
   };
 
   if (isCompleted && actualDistance < targetDistance) {
-    showDashboardMessage(`ระยะทางยังไม่ถึงเป้า ${formatDistance(targetDistance)} กรุณาเลือกทำเควสไม่สำเร็จ`, 'error');
+    showDashboardMessage('กรุณาตรวจสอบข้อมูลให้ถูกต้อง', 'error');
     return;
   }
 
@@ -1211,6 +1233,7 @@ async function handleRejectAdjustmentClick() {
 
 function bindEvents() {
   elements.logoutButton.addEventListener('click', redirectToLogin);
+  elements.messageClose.addEventListener('click', () => showDashboardMessage(''));
   elements.profileGateForm.addEventListener('submit', handleProfileGateSubmit);
   elements.firstRunForm.addEventListener('submit', handleFirstRunSubmit);
   elements.goalGateForm.addEventListener('submit', handleGoalGateSubmit);

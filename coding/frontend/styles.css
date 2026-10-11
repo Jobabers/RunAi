@@ -345,23 +345,155 @@ textarea:focus {
 }
 
 .message {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 8px;
-  margin: 0 0 12px;
-  padding: 9px 11px;
-  font-size: 0.76rem;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+  font-size: 0.84rem;
   font-weight: 800;
-  line-height: 1.45;
+  line-height: 1.5;
   text-align: left;
 }
 
+.message::before {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  box-sizing: border-box;
+  content: "!";
+  font-size: 1rem;
+  font-weight: 900;
+}
+
 .message.success {
-  background: var(--green-soft);
-  color: var(--green);
+  border-color: rgba(84, 210, 138, 0.3);
+  background: linear-gradient(90deg, rgba(29, 116, 70, 0.36), rgba(12, 9, 11, 0.78));
+  color: #a6f0bd;
+}
+
+.message.success::before {
+  content: "✓";
 }
 
 .message.error {
-  background: var(--red-soft);
-  color: var(--red);
+  border-color: rgba(255, 62, 98, 0.38);
+  background: linear-gradient(90deg, rgba(126, 13, 37, 0.72), rgba(12, 9, 11, 0.78));
+  color: #ff9caf;
+}
+
+.notification-container {
+  position: fixed;
+  z-index: 12;
+  top: 88px;
+  right: clamp(16px, 4vw, 44px);
+  width: min(420px, calc(100vw - 32px));
+  margin: 0;
+}
+
+.notification-item {
+  --notification-accent: #ff9caf;
+  --notification-grid: rgba(255, 126, 151, 0.14);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 123, 148, 0.38);
+  border-radius: 8px;
+  background-color: rgba(49, 10, 20, 0.96);
+  background-image: linear-gradient(0deg, transparent 24%, var(--notification-grid) 25%, var(--notification-grid) 26%, transparent 27%), linear-gradient(90deg, transparent 24%, var(--notification-grid) 25%, var(--notification-grid) 26%, transparent 27%);
+  background-size: 36px 36px;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.35);
+  color: var(--notification-accent);
+  animation: notification-enter 220ms ease-out;
+}
+
+.notification-item.success {
+  --notification-accent: #a6f0bd;
+  --notification-grid: rgba(108, 224, 148, 0.12);
+  border-color: rgba(84, 210, 138, 0.36);
+  background-color: rgba(17, 76, 48, 0.96);
+}
+
+.notification-content {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 0 13px 14px;
+}
+
+.notification-icon {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  box-sizing: border-box;
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+.notification-text {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.notification-close {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  place-items: center;
+  margin-right: 7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: currentColor;
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.notification-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.notification-progress-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: currentColor;
+  transform-origin: left;
+}
+
+.notification-progress-bar.is-running {
+  animation: notification-progress 5s linear forwards;
+}
+
+@keyframes notification-enter {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes notification-progress {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
 }
 
 .divider {
@@ -473,16 +605,16 @@ textarea:focus {
 .dashboard-topbar {
   position: sticky;
   z-index: 4;
-  top: 0;
+  /*top: 0;*/
   display: flex;
   min-height: 68px;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(7, 5, 6, 0.78);
+  /*border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(7, 5, 6, 0.78);*/
   padding: 14px clamp(16px, 4vw, 44px);
-  backdrop-filter: blur(16px);
+  /*backdrop-filter: blur(16px);*/
 }
 
 .topbar-actions {
