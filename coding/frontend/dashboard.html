@@ -294,16 +294,43 @@
 
     </div>
     <section class="running-insights" aria-labelledby="insightsHeading">
-      <h2 id="insightsHeading">พัฒนาการและแผนการฝึก</h2>
-      <p id="insightsMessage" role="status"></p>
-      <p id="insightsMetrics"></p>
-      <p id="insightsSource"></p>
-      <p id="insightsSummary"></p>
-      <p id="insightsRecommendation"></p>
-      <button type="button" class="primary-button compact-action-button" id="analyzeProgressButton">วิเคราะห์พัฒนาการ</button>
-      <button type="button" class="ghost-button" id="retryAnalysisButton">ลองเตรียมแผนปรับใหม่</button>
-      <details id="planHistoryDetails">
-        <summary>ประวัติและรายละเอียดการปรับแผน</summary>
+      <div class="insights-header">
+        <div>
+          <p class="eyebrow">AI Coach Console</p>
+          <h2 id="insightsHeading">พัฒนาการและแผนการฝึก</h2>
+          <p class="insights-subtitle">สรุปผลการวิ่งล่าสุดและคำแนะนำสำหรับเควสถัดไป</p>
+        </div>
+        <span class="insights-engine">Gemini AI</span>
+      </div>
+
+      <div class="insights-snapshot">
+        <div class="insights-metrics-block">
+          <span class="insights-label">RUNNING SNAPSHOT</span>
+          <p id="insightsMetrics">กำลังเตรียมข้อมูลการวิ่ง...</p>
+        </div>
+        <p id="insightsSource" class="insights-source"></p>
+      </div>
+
+      <div class="insights-body">
+        <article class="insights-analysis">
+          <span class="insights-label">COACH'S NOTE</span>
+          <p id="insightsSummary">ยังไม่มีผลวิเคราะห์</p>
+          <div class="insights-recommendation">
+            <span class="insights-label">NEXT FOCUS</span>
+            <p id="insightsRecommendation">กดวิเคราะห์พัฒนาการเพื่อรับคำแนะนำจาก AI</p>
+          </div>
+        </article>
+
+        <aside class="insights-actions" aria-label="คำสั่งการวิเคราะห์">
+          <p>อัปเดตคำแนะนำตาม Running Record ล่าสุดของคุณ</p>
+          <button type="button" class="primary-button compact-action-button" id="analyzeProgressButton">วิเคราะห์พัฒนาการ</button>
+          <button type="button" class="ghost-button" id="retryAnalysisButton">ลองเตรียมแผนปรับใหม่</button>
+          <p id="insightsMessage" class="insights-message" role="status"></p>
+        </aside>
+      </div>
+
+      <details id="planHistoryDetails" class="insights-history">
+        <summary><span>ประวัติและรายละเอียดการปรับแผน</span><span class="history-hint">ดูแผนก่อนและหลังปรับ</span></summary>
         <div id="planHistoryList"></div>
       </details>
     </section>
