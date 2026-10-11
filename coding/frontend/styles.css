@@ -1895,7 +1895,7 @@ a.panel-link:hover {
 .goal-achievement p { line-height: 1.6; overflow-wrap: anywhere; }
 .goal-achievement button { margin: 4px 8px 4px 0; max-width: 100%; white-space: normal; }
 
-.running-insights { position: relative; overflow: hidden; margin-top: 30px; border: 1px solid rgba(210,163,74,.4); border-radius: 8px; background: rgba(12,9,11,.78); box-shadow: 0 20px 48px rgba(0,0,0,.26); padding: 22px; }
+.running-insights { position: relative; overflow: hidden; margin-top: 30px; border: 1px solid rgba(210,163,74,.4); border-radius: 8px; background: linear-gradient(180deg,rgba(112,16,35,.18),rgba(8,7,9,.16)),rgba(12,9,11,.78); box-shadow: 0 20px 48px rgba(0,0,0,.26); padding: 22px; }
 .running-insights::before { position: absolute; top: 0; left: 0; width: 100%; height: 3px; background: linear-gradient(90deg,transparent,var(--gold),transparent); content: ''; }
 .insights-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; border-bottom: 1px solid rgba(232,197,112,.2); padding-bottom: 16px; }
 .insights-header h2 { margin: 4px 0 6px; color: #fff8f9; font-size: 1.5rem; }
