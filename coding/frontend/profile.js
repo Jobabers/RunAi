@@ -6,10 +6,10 @@ const elements = {
   name: document.getElementById('nameInput'), age: document.getElementById('ageInput'), weight: document.getElementById('weightInput'), height: document.getElementById('heightInput'), experience: document.getElementById('experienceInput'),
   initial: document.getElementById('profileInitial'), summaryName: document.getElementById('summaryName'), summaryEmail: document.getElementById('summaryEmail'), summaryExperience: document.getElementById('summaryExperience'), summaryAge: document.getElementById('summaryAge'), summaryWeight: document.getElementById('summaryWeight'), summaryHeight: document.getElementById('summaryHeight'),
 };
-function redirectToLogin() { localStorage.removeItem('runai_token'); localStorage.removeItem('runai_user'); window.location.href = 'index.html'; }
+function redirectToLogin() { window.runaiSignOut?.(); localStorage.removeItem('runai_token'); localStorage.removeItem('runai_user'); window.location.href = 'index.html'; }
 function showMessage(message, type = 'success') { elements.message.textContent = message; elements.message.className = `message ${type}`; elements.message.classList.toggle('hidden', !message); }
 async function apiFetch(path, options = {}) {
-  const response = await fetch(`${API_BASE}${path}`, { ...options, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(options.headers || {}) } });
+  const response = await fetch(`${API_BASE}${path}`, { ...options, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('runai_token')}`, ...(options.headers || {}) } });
   const data = await response.json().catch(() => ({}));
   if (response.status === 401) { redirectToLogin(); throw new Error('กรุณาเข้าสู่ระบบก่อนใช้งาน'); }
   if (!response.ok) throw new Error(data.error?.message || 'เชื่อมต่อ API ไม่สำเร็จ');

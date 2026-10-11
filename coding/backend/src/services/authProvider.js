@@ -15,6 +15,21 @@ function isSupabaseMode() {
   return config.storageDriver === 'supabase';
 }
 
+function getBrowserAuthConfig() {
+  if (!isSupabaseMode()) {
+    throw new HttpError(503, 'Google Sign-In ใช้งานได้เมื่อเชื่อมต่อ Supabase แล้ว');
+  }
+
+  if (!config.supabase.url || !config.supabase.publishableKey) {
+    throw new HttpError(500, 'ยังไม่ได้ตั้งค่า SUPABASE_URL หรือ SUPABASE_PUBLISHABLE_KEY สำหรับ Google Sign-In');
+  }
+
+  return {
+    supabaseUrl: config.supabase.url,
+    publishableKey: config.supabase.publishableKey,
+  };
+}
+
 function getAuthApiKey() {
   return config.supabase.publishableKey || config.supabase.serviceRoleKey;
 }
@@ -202,7 +217,9 @@ function resetForTests() {
 }
 
 module.exports = {
+  getBrowserAuthConfig,
   getUserFromToken,
+  isSupabaseMode,
   loginUser,
   normalizeEmail,
   registerUser,
