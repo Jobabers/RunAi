@@ -1107,7 +1107,7 @@ async function handleQuestSubmit(event) {
   };
 
   if (isCompleted && actualDistance < targetDistance) {
-    showDashboardMessage(`ระยะทางยังไม่ถึงเป้า ${formatDistance(targetDistance)} กรุณาเลือกทำเควสไม่สำเร็จ`, 'error');
+    showDashboardMessage('กรุณาตรวจสอบข้อมูลให้ถูกต้อง', 'error');
     return;
   }
 

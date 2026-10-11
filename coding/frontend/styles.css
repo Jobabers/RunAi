@@ -345,23 +345,49 @@ textarea:focus {
 }
 
 .message {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 8px;
-  margin: 0 0 12px;
-  padding: 9px 11px;
-  font-size: 0.76rem;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+  font-size: 0.84rem;
   font-weight: 800;
-  line-height: 1.45;
+  line-height: 1.5;
   text-align: left;
 }
 
+.message::before {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  box-sizing: border-box;
+  content: "!";
+  font-size: 1rem;
+  font-weight: 900;
+}
+
 .message.success {
-  background: var(--green-soft);
-  color: var(--green);
+  border-color: rgba(84, 210, 138, 0.3);
+  background: linear-gradient(90deg, rgba(29, 116, 70, 0.36), rgba(12, 9, 11, 0.78));
+  color: #a6f0bd;
+}
+
+.message.success::before {
+  content: "✓";
 }
 
 .message.error {
-  background: var(--red-soft);
-  color: var(--red);
+  border-color: rgba(255, 62, 98, 0.38);
+  background: linear-gradient(90deg, rgba(126, 13, 37, 0.72), rgba(12, 9, 11, 0.78));
+  color: #ff9caf;
 }
 
 .divider {
