@@ -35,7 +35,15 @@ async function main() {
     const user = await admin('', 'POST', { email, password, email_confirm: true });
     userId = user.id || user.user?.id;
     assert.ok(userId);
-    token = (await api('/auth/login', 'POST', { email, password })).token;
+    const sessionResponse = await fetch(`${config.supabase.authUrl}/token?grant_type=password`, {
+      method: 'POST',
+      headers: { apikey: config.supabase.publishableKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+      signal: AbortSignal.timeout(20000),
+    });
+    const session = await sessionResponse.json();
+    assert.ok(sessionResponse.ok, `Supabase Auth test session: HTTP ${sessionResponse.status}`);
+    token = session.access_token;
     assert.ok(config.supabase.publishableKey, 'Publishable key required for RPC permission test');
     for (const [name, body] of [['runai_mutate', { p_user: userId, p_action: 'refresh', p_data: {} }], ['get_runai_dashboard', { requested_user_id: userId }]]) {
       const anonymous = await fetch(`${config.supabase.restUrl}/rpc/${name}`, { method: 'POST', headers: { apikey: config.supabase.publishableKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(15000) });
